@@ -1,0 +1,343 @@
+@{
+    var access = (Context.Session.GetString("Access") ?? string.Empty).Trim();
+    var role = access.ToUpperInvariant();
+    var normalized = role.Replace(' ', '_');
+    var isAdmin = normalized == "ADMIN";
+    var canSeeEngineering = normalized == "ADMIN" || normalized == "FULL" || normalized == "ENGINEERING" || normalized == "PLANNING" || normalized == "PLANING"; // PLANING legacy
+    var canSeeWps = normalized == "ADMIN" || normalized == "FULL" || normalized == "QC_MANAGER" || normalized == "QC_SUPERVISOR" || normalized == "QC_DCC" || normalized == "WELDING_ENGINEER"; 
+    var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty);
+    var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty);
+
+    // Compute a reliable display name for the header. Prefer ViewBag.FullName, then session FullName,
+    // then combine FirstName+LastName from session, then fall back to UserName and finally a generic label.
+    var headerFullName = (ViewBag.FullName as string) ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(headerFullName))
+    {
+        headerFullName = Context.Session.GetString("FullName") ?? string.Empty;
+    }
+    if (string.IsNullOrWhiteSpace(headerFullName))
+    {
+        var sf = Context.Session.GetString("FirstName") ?? string.Empty;
+        var sl = Context.Session.GetString("LastName") ?? string.Empty;
+        var comb = (sf + " " + sl).Trim();
+        if (!string.IsNullOrWhiteSpace(comb)) headerFullName = comb;
+    }
+    if (string.IsNullOrWhiteSpace(headerFullName))
+    {
+        headerFullName = Context.Session.GetString("UserName") ?? string.Empty;
+    }
+    if (string.IsNullOrWhiteSpace(headerFullName)) headerFullName = "User";
+}
+<div class="header-bar">
+    <a asp-action="Dashboard" asp-controller="Home" aria-label="Go to Dashboard">
+        <img src="~/img/PMS_logo_2.png" alt="Logo" class="main-logo">
+    </a>
+    <div class="nav-titles">
+        <!-- Welders Qualifications Dropdown -->
+        <div class="dropdown">
+            <span class="db-title dropdown-toggle">Welders Qualifications</span>
+            <div class="dropdown-content">
+                @if (!(currentAction == "WelderList" && currentController == "Home"))
+                {
+                    <a asp-controller="Home" asp-action="WelderList" asp-route-id="">Welder List</a>
+                }
+                @if (!(currentAction == "WrrStatus" && currentController == "Home") && !(currentAction == "WelderStatus" && currentController == "Home"))
+                {
+                    <a asp-controller="Home" asp-action="WrrStatus">WRR Status</a>
+                }
+                <a href="#">Project WRR Status <span style="color: green;">In Plan</span></a>
+            </div>
+        </div>
+
+        <!-- Logs Dropdown -->
+        <div class="dropdown">
+            <span class="db-title dropdown-toggle">Logs</span>
+            <div class="dropdown-content">
+                <div class="submenu-parent" style="position: relative;">
+                    <a href="#" class="has-submenu">Transmittal <span class="submenu-arrow">&#9654;</span></a>
+                    <div class="submenu">
+                        @if (!(currentAction == "TransmittalLog" && currentController == "Home"))
+                        {
+                            <a asp-controller="Home" asp-action="TransmittalLog">Log</a>
+                        }
+                        @if (!(currentAction == "TransmittalStatus" && currentController == "Home"))
+                        {
+                            <a asp-controller="Home" asp-action="TransmittalStatus">Status</a>
+                        }
+                    </div>
+                </div>
+                <div class="submenu-parent" style="position: relative;">
+                    <a href="#" class="has-submenu">RFI <span class="submenu-arrow">&#9654;</span></a>
+                    <div class="submenu">
+                        @if (!(currentAction == "RfiLog" && currentController == "Home"))
+                        {
+                            <a asp-controller="Home" asp-action="RfiLog">Log</a>
+                        }
+                        @if (!(currentAction == "RfiStatus" && currentController == "Home"))
+                        {
+                            <a asp-controller="Home" asp-action="RfiStatus">Status</a>
+                        }
+                    </div>
+                </div>
+                @if (canSeeWps && !(currentAction == "WpsLog" && currentController == "Home"))
+                {
+                    <a asp-action="WpsLog" asp-controller="Home">WPS</a>
+                }
+                <a id="lnkPaintingLog" href="/Home/PaintingLog">Painting</a>
+            </div>
+        </div>
+
+        <!-- Input Dropdown -->
+        <div class="dropdown">
+            <span class="db-title dropdown-toggle">Input</span>
+            <div class="dropdown-content">
+                <div class="submenu-parent" style="position: relative;">
+                    <a href="#" class="has-submenu">Welding<span class="submenu-arrow">&#9654;</span></a>
+                    <div class="submenu">
+                        @if (!(currentAction == "DailyFitup" && currentController == "Home"))
+                        {
+                            <a asp-action="DailyFitup" asp-controller="Home">Daily Fit-up</a>
+                        }
+                        @if (!(currentAction == "DailyWelding" && currentController == "Home"))
+                        {
+                            <a asp-action="DailyWelding" asp-controller="Home">Daily Welding</a>
+                        }
+                        <a href="#">RT <span style="color: green;">In Plan</span></a>
+                        <a href="#">Other NDT <span style="color: green;">In Plan</span></a>
+                        <a href="#">PWHT <span style="color: green;">In Plan</span></a>
+                        <a href="#">HT <span style="color: green;">In Plan</span></a>
+                    </div>
+                </div>
+                <div class="submenu-parent" style="position: relative;">
+                    <a href="#" class="has-submenu">Selection<span class="submenu-arrow">&#9654;</span></a>
+                    <div class="submenu">
+                        <a asp-action="RtSelection" asp-controller="Home">RT</a>
+                        <a asp-action="HtSelection" asp-controller="Home">HT</a>
+                    </div>
+                </div>
+                <a href="#">Release to Painting <span style="color: green;">In Plan</span></a>
+                <a href="#">Painting <span style="color: green;">In Plan</span></a>
+                <a href="#">Release to Dispatch <span style="color: green;">In Plan</span></a>
+                @if (!(currentAction == "PlnLog" && currentController == "Home"))
+                {
+                    <a asp-action="PlnLog" asp-controller="Home">Productivity Plan</a>
+                }
+            </div>
+        </div>
+
+        <!-- Status Dropdown -->
+        <div class="dropdown">
+            <span class="db-title dropdown-toggle">Status</span>
+            <div class="dropdown-content">
+                <a id="lnkFabricationLog" href="/Home/SpoolReleaseLog">Spool Fabrication</a>
+                <a asp-controller="Home" asp-action="SpoolErectionLog">Spool Erection</a>
+                <a id="lnkJointProgress" href="/Home/JointProgress">Joint Progress</a>
+                <a href="#">NDE <span style="color: green;">In Plan</span></a>
+                <a href="#">Hydrotest <span style="color: green;">In Plan</span></a>
+
+            </div>
+        </div>
+
+        @if (canSeeEngineering)
+        {
+            <!-- Engineering Dropdown (Admin, Full, Engineering, Planning) -->
+            <div class="dropdown">
+                <span class="db-title dropdown-toggle">Engineering</span>
+                <div class="dropdown-content">
+                    <a asp-action="Drawings" asp-controller="Home">Drawings</a>
+                    <a asp-action="JointRecord" asp-controller="Home">Joint Record</a>
+                    @if (!(currentAction == "NdtPercentage" && currentController == "Home"))
+                    {
+                        <a asp-action="NdtPercentage" asp-controller="Home">NDT Percentage</a>
+                    }
+                    @if (!(currentAction == "HydrotestFlag" && currentController == "Home"))
+                    {
+                        <a asp-action="HydrotestFlag" asp-controller="Home">Hydrotest Flag</a>
+                    }
+                    <a href="#">Hold List <span style="color: green;">In Plan</span></a>
+                </div>
+            </div>
+        }
+
+        <!-- Abbreviations (single page link – hidden when already on the page) -->
+        @if (!(currentAction == "Abbreviations" && currentController == "Home"))
+        {
+            <a asp-action="Abbreviations" asp-controller="Home" class="db-title" style="text-decoration:none;">Abbreviations</a>
+        }
+
+        @if (isAdmin)
+            {
+                <!-- Control Dropdown (Admin only) -->
+                <div class="dropdown">
+                    <span class="db-title dropdown-toggle">Control</span>
+                    <div class="dropdown-content">
+                        @if (!(currentAction == "LoginApproval" && currentController == "Home"))
+                        {
+                            <a asp-action="LoginApproval" asp-controller="Home">Login Approval</a>
+                        }
+                        @if (!(currentAction == "ProjectLog" && currentController == "Home"))
+                        {
+                            <a asp-action="ProjectLog" asp-controller="Home">Project Log</a>
+                        }
+                        @if (!(currentAction == "ControlLookups" && currentController == "Home"))
+                        {
+                            <a asp-action="ControlLookups" asp-controller="Home">Control Lookups</a>
+                        }
+                        <!-- Maintenance Mode Toggle -->
+                            <div class="maintenance-toggle-item" style="padding:8px 16px; border-top:1px solid #eee; margin-top:4px;">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; white-space:nowrap; font-size:0.92em; color:#333;">
+                                    <span>Maintenance Mode</span>
+                                    <span class="maint-switch" id="maintSwitch" title="Toggle maintenance mode">
+                                        <input type="checkbox" id="maintToggle" style="display:none;" />
+                                        <span class="maint-slider"></span>
+                                    </span>
+                                    <span id="maintStatusBadge" class="maint-badge maint-badge-off">OFF</span>
+                                </label>
+                                <!-- Duration picker (shown only when enabling) -->
+                                <div id="maintDurationRow" style="display:none; margin-top:6px; padding-top:6px; border-top:1px dashed #ddd;">
+                                    <label style="display:flex; align-items:center; gap:6px; font-size:0.85em; color:#555; white-space:nowrap;">
+                                        <span>Est. duration</span>
+                                        <input type="number" id="maintDuration" min="1" max="1440" placeholder="min"
+                                               style="width:58px; padding:3px 5px; border:1px solid #bbb; border-radius:3px; font-size:0.95em; color:#176d8a; text-align:center;" />
+                                        <span style="color:#999;">min</span>
+                                    </label>
+                                </div>
+                            </div>
+                    </div>
+                </div>
+            }
+    </div>
+
+    <div class="user-section">
+        <span class="welcome-user">Welcome, <a asp-action="Profile" asp-controller="Home" class="user-name profile-link" title="View Profile">@headerFullName</a></span>
+        <form asp-action="Logout" asp-controller="Home" method="post" style="display:inline;">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+    </div>
+</div>
+
+@if (isAdmin)
+{
+<style>
+    /* ===== MAINTENANCE TOGGLE SWITCH ===== */
+    .maint-switch {
+        position: relative;
+        display: inline-block;
+        width: 38px;
+        height: 20px;
+        flex-shrink: 0;
+    }
+    .maint-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #ccc;
+        border-radius: 20px;
+        transition: background-color 0.3s;
+    }
+    .maint-slider::before {
+        content: "";
+        position: absolute;
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: #fff;
+        border-radius: 50%;
+        transition: transform 0.3s;
+    }
+    .maint-switch.active .maint-slider {
+        background-color: #e74c3c;
+    }
+    .maint-switch.active .maint-slider::before {
+        transform: translateX(18px);
+    }
+    .maint-badge {
+        font-size: 0.75em;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .maint-badge-off { background: #d4edda; color: #155724; }
+    .maint-badge-on  { background: #f8d7da; color: #721c24; }
+</style>
+<script>
+(function () {
+    var toggle = document.getElementById('maintToggle');
+    var switchEl = document.getElementById('maintSwitch');
+    var badge = document.getElementById('maintStatusBadge');
+    var durationRow = document.getElementById('maintDurationRow');
+    var durationInput = document.getElementById('maintDuration');
+    if (!toggle || !switchEl || !badge) return;
+
+    var token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+    // Load initial state
+    fetch('/Home/MaintenanceStatus')
+        .then(function (r) { return r.json(); })
+        .then(function (d) { applyState(d.enabled); })
+        .catch(function () { /* silently ignore */ });
+
+    switchEl.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var enabling = !toggle.checked;
+
+        // If enabling and no duration entered yet, show the duration row and wait
+        if (enabling && durationRow.style.display === 'none') {
+            durationRow.style.display = 'block';
+            durationInput.focus();
+            return;
+        }
+
+        var body = new URLSearchParams();
+        body.append('enable', enabling);
+        body.append('__RequestVerificationToken', token);
+
+        if (enabling) {
+            var mins = parseInt(durationInput.value, 10);
+            if (mins > 0) body.append('durationMinutes', mins);
+        }
+
+        fetch('/Home/ToggleMaintenance', { method: 'POST', body: body })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { applyState(d.enabled); })
+            .catch(function () { alert('Failed to toggle maintenance mode.'); });
+    });
+
+    // Also allow Enter key in the duration input to confirm
+    if (durationInput) {
+        durationInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                switchEl.click();
+            }
+        });
+        // Prevent dropdown from closing when clicking the input
+        durationInput.addEventListener('click', function (e) { e.stopPropagation(); });
+        durationRow.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+
+    function applyState(enabled) {
+        toggle.checked = enabled;
+        if (enabled) {
+            switchEl.classList.add('active');
+            badge.textContent = 'ON';
+            badge.className = 'maint-badge maint-badge-on';
+            durationRow.style.display = 'none';
+            durationInput.value = '';
+        } else {
+            switchEl.classList.remove('active');
+            badge.textContent = 'OFF';
+            badge.className = 'maint-badge maint-badge-off';
+            durationRow.style.display = 'none';
+            durationInput.value = '';
+        }
+    }
+})();
+</script>
+}

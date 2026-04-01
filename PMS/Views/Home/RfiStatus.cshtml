@@ -1,0 +1,342 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = "_LayoutDashboard";
+    ViewData["Title"] = "RFI Status";
+    var statusData = (ViewBag.StatusData as List<PMS.Models.RfiStatusGroup>) ?? new List<PMS.Models.RfiStatusGroup>();
+    var statusDate = (ViewBag.StatusDate as string) ?? "";
+    var defaultProjectId = ViewBag.DefaultProjectId as int?;
+}
+
+@section Head {
+    <style>
+        .rfi-status-container { padding: 12px 12px 32px; background: #fff8eb; min-height: calc(100vh - 120px); }
+        .rfi-status-card { background: #fff8eb; border: 1px solid #e6f6fa; border-radius: 10px; box-shadow: 0 4px 12px rgba(31,153,190,0.12); padding: 14px 16px; }
+        .rfi-status-header { font-size: 1.3em; font-weight: 700; color: #176d8a; margin-bottom: 12px; }
+        .rfi-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: flex-end; }
+        .rfi-filter { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+        .rfi-filter label { color: #176d8a; font-weight: 600; font-size: .9rem; }
+        .rfi-input { padding: 8px 10px; border: 1px solid #cce7ef; border-radius: 6px; color: #176d8a; background: #fff; min-width: 320px; font-size: .9rem; }
+        .rfi-input:focus { border-color: #176d8a; outline: none; }
+        .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid transparent; font-weight: 700; cursor: pointer; line-height: 1.2; font-size: .9rem; }
+        .btn-primary { background: #1f99be; color: #fff; border-color: #1f99be; }
+        .btn-primary:hover { background: #176d8a; border-color: #176d8a; }
+        .btn-outline { background: #fff; color: #176d8a; border: 1px solid #1f99be; text-decoration: none; }
+        .btn-outline:hover { background: #1f99be; color: #fff; }
+        .rfi-date { color: #176d8a; font-weight: 700; font-size: .95rem; margin-bottom: 10px; text-align: right; }
+
+        /* Status table */
+        .rfi-group { margin-bottom: 18px; background: #fff; border: 1px solid #e6f6fa; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(31,153,190,0.06); }
+        .rfi-group-title { font-size: 1.1em; font-weight: 700; color: #fff; background: #00bfff; text-align: center; padding: 8px 12px; margin: 0; }
+        .rfi-table-wrap { overflow: auto; max-height: 50vh; scrollbar-color: #1f99be #f0fbff; scrollbar-width: thin; }
+        .rfi-table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+        .rfi-table-wrap::-webkit-scrollbar-track { background: #f0fbff; border-radius: 8px; }
+        .rfi-table-wrap::-webkit-scrollbar-thumb { background: #1f99be; border-radius: 8px; }
+        .rfi-table { width: 100%; border-collapse: collapse; background: #fff; }
+        .rfi-table th, .rfi-table td { border: 1px solid #cce7ef; padding: 7px 10px; color: #176d8a; font-size: .82rem; white-space: nowrap; text-align: center; }
+        .rfi-table th { position: sticky; top: 0; z-index: 1; font-weight: 700; }
+        .rfi-table thead th { background: #e6f6fa; }
+        .rfi-table thead th.under-review-col { background: #ffc107; color: #333; }
+        .rfi-table tr:hover td { background: #f8fcff; }
+        .rfi-table .total-row td { font-weight: 700; background: #e6f6fa; border-top: 2px solid #176d8a; }
+        .rfi-table .open-col { background: #ffe600; font-weight: 700; color: #333; }
+        .rfi-table .open-col-header { background: #ffe600; font-weight: 700; color: #333; }
+        .rfi-table .total-row .open-col { background: #ff4444; color: #fff; font-weight: 900; font-size: .95rem; }
+        /* Charts */
+        .rfi-charts-row { display: flex; gap: 12px; flex-wrap: wrap; padding: 10px 12px 12px; }
+        .rfi-chart-card { flex: 3 1 280px; background: #f8fcff; border: 1px solid #e6f6fa; border-radius: 8px; padding: 8px; min-width: 0; max-height: 280px; }
+        .rfi-chart-card-sm { flex: 2 1 200px; background: #f8fcff; border: 1px solid #e6f6fa; border-radius: 8px; padding: 8px; min-width: 0; max-height: 280px; }
+        .rfi-chart-title { font-weight: 700; color: #176d8a; margin-bottom: 8px; font-size: .95rem; text-align: center; }
+        .rfi-empty { color: #176d8a; font-size: .95rem; padding: 20px 0; }
+
+        /* Searchable select */
+        .ss-wrap { position: relative; display: inline-block; vertical-align: middle; }
+        .ss-wrap.w350 { width: 350px; min-width: 350px; }
+        .ss-input { width: 100%; box-sizing: border-box; cursor: pointer; padding: 8px 12px; border: 1px solid #cce7ef; border-radius: 6px; color: #176d8a; font-size: .9rem; background: #fff; }
+        .ss-input:focus { cursor: text; border-color: #1f99be; outline: none; }
+        .ss-list { display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 1200; background: #fff; border: 1px solid #1f99be; border-top: none; border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,.12); }
+        .ss-item { padding: 6px 10px; cursor: pointer; font-size: .9rem; color: #176d8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ss-item:hover, .ss-item.ss-highlight { background: #e6f6fa; }
+        .ss-item.ss-active { font-weight: 700; }
+        .ss-empty { padding: 6px 10px; font-size: .85rem; color: #999; font-style: italic; }
+        .ss-open .ss-input { border-radius: 6px 6px 0 0; border-color: #1f99be; }
+
+        @@media (max-width: 1200px) { .rfi-charts-row { flex-direction: column; } }
+        @@media (max-width: 640px) { .rfi-status-container { padding: 12px; } .rfi-input { min-width: 100%; } }
+    </style>
+}
+
+<div class="rfi-status-container">
+    <div class="rfi-status-card">
+        <div class="rfi-status-header">
+            <span>RFI Status</span>
+        </div>
+
+        <form method="get" asp-action="RfiStatus" asp-controller="Home" class="rfi-filters" id="rfiStatusFilterForm">
+            <div class="rfi-filter">
+                <label for="projectSelect">Project</label>
+                <select id="projectSelect" name="projectId" class="rfi-input searchable-select w350">
+                    @foreach (var p in (IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.FilterProjects)
+                    {
+                        <option value="@p.Value" selected="@p.Selected">@p.Text</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Load</button>
+            @if (statusData.Count > 0)
+            {
+                <a href="@Url.Action("ExportRfiStatus", "Home", new { projectId = defaultProjectId })"
+                   class="btn btn-outline" title="Download Excel">
+                    <i class="fa fa-file-excel-o"></i> Download Excel
+                </a>
+            }
+        </form>
+
+        @if (statusData.Count == 0)
+        {
+            <div class="rfi-empty">Select a project and click Load to view RFI status.</div>
+        }
+        else
+        {
+            <div class="rfi-date">Date: @statusDate</div>
+
+            var chartIdx = 0;
+            foreach (var grp in statusData)
+            {
+                var locLabel = grp.LocationType.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0 ? "SHOP" : "FIELD";
+                var titleLabel = $"RFI STATUS {locLabel}";
+                <div class="rfi-group">
+                    <h3 class="rfi-group-title">@titleLabel</h3>
+                    <div class="rfi-table-wrap">
+                        <table class="rfi-table">
+                            <thead>
+                                <tr>
+                                    <th rowspan="2">Sr No.</th>
+                                    <th rowspan="2">Sub-Discipline</th>
+                                    <th rowspan="2">Raised RFIs</th>
+                                    <th rowspan="2">Closed</th>
+                                    <th rowspan="2">Cancelled</th>
+                                    <th colspan="3" class="under-review-col">Under @grp.Contractor</th>
+                                    <th rowspan="2">Under Contractor<br/>/ PID SIGN</th>
+                                    <th rowspan="2">PMT SIGN<br/>BALANCE</th>
+                                    <th rowspan="2">Under<br/>Scanning</th>
+                                    <th rowspan="2" class="open-col-header">TOTAL OPEN RFIs</th>
+                                </tr>
+                                <tr>
+                                    <th class="under-review-col">Inspection<br/>Date</th>
+                                    <th class="under-review-col">Less than<br/>72HRS</th>
+                                    <th class="under-review-col">More than<br/>72HRS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{ var sr = 1; }
+                                @foreach (var row in grp.Rows)
+                                {
+                                    <tr>
+                                        <td>@sr</td>
+                                        <td style="text-align:left;">@row.Discipline</td>
+                                        <td>@row.Raised</td>
+                                        <td>@row.Closed</td>
+                                        <td>@row.Cancelled</td>
+                                        <td>@row.UnderReviewInspDate</td>
+                                        <td>@row.UnderReviewLess72</td>
+                                        <td>@row.UnderReviewMore72</td>
+                                        <td>@row.UnderQcPidSign</td>
+                                        <td>@row.PmtSignBalance</td>
+                                        <td>@row.UnderScanningWithPmtSign</td>
+                                        <td class="open-col">@row.TotalOpen</td>
+                                    </tr>
+                                    sr++;
+                                }
+                                <tr class="total-row">
+                                    <td colspan="2" style="text-align:center;font-weight:700;">TOTAL</td>
+                                    <td>@grp.Total.Raised</td>
+                                    <td>@grp.Total.Closed</td>
+                                    <td>@grp.Total.Cancelled</td>
+                                    <td>@grp.Total.UnderReviewInspDate</td>
+                                    <td>@grp.Total.UnderReviewLess72</td>
+                                    <td>@grp.Total.UnderReviewMore72</td>
+                                    <td>@grp.Total.UnderQcPidSign</td>
+                                    <td>@grp.Total.PmtSignBalance</td>
+                                    <td>@grp.Total.UnderScanningWithPmtSign</td>
+                                    <td class="open-col">@grp.Total.TotalOpen</td>
+                                </tr>
+
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Charts for this group -->
+                    <div class="rfi-charts-row">
+                        <div class="rfi-chart-card">
+                            <div class="rfi-chart-title">@titleLabel — Status Distribution</div>
+                            <canvas id="barChart_@chartIdx" height="120"></canvas>
+                        </div>
+                        <div class="rfi-chart-card-sm">
+                            <div class="rfi-chart-title">@titleLabel — Open RFIs Breakdown</div>
+                            <canvas id="pieChart_@chartIdx" height="120"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                chartIdx++;
+            }
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chart.js/chart.umd.min.js"></script>
+    <script id="rfiStatusChartData" type="application/json">
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(statusData.Select((g, i) => new {
+            idx = i,
+            title = $"RFI STATUS {(g.LocationType.IndexOf("Shop", StringComparison.OrdinalIgnoreCase) >= 0 ? "SHOP" : "FIELD")}",
+            labels = g.Rows.Select(r => r.Discipline).ToArray(),
+            raised = g.Rows.Select(r => r.Raised).ToArray(),
+            closed = g.Rows.Select(r => r.Closed).ToArray(),
+            cancelled = g.Rows.Select(r => r.Cancelled).ToArray(),
+            underReview = g.Rows.Select(r => r.UnderReviewInspDate + r.UnderReviewLess72 + r.UnderReviewMore72).ToArray(),
+            underQc = g.Rows.Select(r => r.UnderQcPidSign).ToArray(),
+            pmtSign = g.Rows.Select(r => r.PmtSignBalance).ToArray(),
+            underSub = g.Rows.Select(r => r.UnderScanningWithPmtSign).ToArray(),
+            totalOpen = g.Rows.Select(r => r.TotalOpen).ToArray(),
+            pieLabels = new[] { "Closed", "Cancelled", "Under Sub Contractor", "Under Contractor / PID SIGN", "PMT SIGN BALANCE", "Under Scanning" },
+            pieValues = new[] {
+                g.Total.Closed,
+                g.Total.Cancelled,
+                g.Total.UnderReviewInspDate + g.Total.UnderReviewLess72 + g.Total.UnderReviewMore72,
+                g.Total.UnderQcPidSign,
+                g.Total.PmtSignBalance,
+                g.Total.UnderScanningWithPmtSign
+            }
+        }).ToArray()))
+    </script>
+    <script>
+    (function () {
+        var groups = JSON.parse(document.getElementById('rfiStatusChartData').textContent);
+        if (!groups || groups.length === 0) return;
+
+        var barColors = [
+            'rgba(31,153,190,0.7)',  // Raised
+            'rgba(39,174,96,0.7)',   // Closed
+            'rgba(192,57,43,0.7)',   // Cancelled
+            'rgba(255,193,7,0.7)',   // Under Review
+            'rgba(142,68,173,0.7)',  // Under QC
+            'rgba(41,128,185,0.7)',  // PMT Sign
+            'rgba(230,126,34,0.7)'   // Under Sub
+        ];
+
+        var pieColors = [
+            '#27ae60', '#c0392b', '#f1c40f', '#8e44ad', '#2980b9', '#e67e22'
+        ];
+
+        groups.forEach(function (g) {
+            // Bar chart: stacked bar per discipline
+            var barCtx = document.getElementById('barChart_' + g.idx);
+            if (barCtx) {
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: g.labels,
+                        datasets: [
+                            { label: 'Raised RFIs', data: g.raised, backgroundColor: barColors[0] },
+                            { label: 'Closed', data: g.closed, backgroundColor: barColors[1] },
+                            { label: 'Cancelled', data: g.cancelled, backgroundColor: barColors[2] },
+                            { label: 'Under Sub Contractor', data: g.underReview, backgroundColor: barColors[3] },
+                            { label: 'Under Contractor / PID SIGN', data: g.underQc, backgroundColor: barColors[4] },
+                            { label: 'PMT SIGN BALANCE', data: g.pmtSign, backgroundColor: barColors[5] },
+                            { label: 'Under Scanning', data: g.underSub, backgroundColor: barColors[6] }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 10 } } },
+                            title: { display: false }
+                        },
+                        scales: {
+                            x: { ticks: { font: { size: 10 } } },
+                            y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+                        }
+                    }
+                });
+            }
+
+            // Pie chart: total breakdown of open RFIs
+            var pieCtx = document.getElementById('pieChart_' + g.idx);
+            if (pieCtx) {
+                new Chart(pieCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: g.pieLabels,
+                        datasets: [{
+                            data: g.pieValues,
+                            backgroundColor: pieColors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 10 } } },
+                            title: { display: false }
+                        }
+                    }
+                });
+            }
+        });
+    })();
+    </script>
+    <script>
+    /* Searchable select widget */
+    (function () {
+        function makeSearchableSelect(sel) {
+            if (!sel || sel.dataset.searchable) return;
+            sel.dataset.searchable = '1';
+            sel.style.display = 'none';
+            var wrap = document.createElement('div');
+            wrap.className = 'ss-wrap';
+            if (sel.classList.contains('w350')) wrap.classList.add('w350');
+            sel.parentNode.insertBefore(wrap, sel);
+            wrap.appendChild(sel);
+            var input = document.createElement('input');
+            input.type = 'text'; input.className = 'ss-input';
+            input.setAttribute('autocomplete', 'off'); input.setAttribute('spellcheck', 'false');
+            wrap.appendChild(input);
+            var list = document.createElement('div');
+            list.className = 'ss-list'; wrap.appendChild(list);
+            var items = [], highlighted = -1, open = false;
+            function buildItems() { items = []; Array.from(sel.options).forEach(function (opt) { items.push({ value: opt.value, text: opt.text || opt.value }); }); }
+            function syncInputText() { var idx = sel.selectedIndex; input.value = idx >= 0 && sel.options[idx] ? (sel.options[idx].text || sel.options[idx].value) : ''; }
+            function render(filter) {
+                list.innerHTML = ''; highlighted = -1; var lc = (filter || '').toLowerCase(); var count = 0;
+                items.forEach(function (item, i) {
+                    if (lc && !(item.text || '').toLowerCase().includes(lc)) return;
+                    var div = document.createElement('div'); div.className = 'ss-item'; div.textContent = item.text; div.dataset.idx = String(i);
+                    if (item.value === sel.value) div.classList.add('ss-active');
+                    div.addEventListener('mousedown', function (e) { e.preventDefault(); pick(i); });
+                    list.appendChild(div); count++;
+                });
+                if (!count) { var em = document.createElement('div'); em.className = 'ss-empty'; em.textContent = 'No matches'; list.appendChild(em); }
+            }
+            function openList() { if (open) return; open = true; wrap.classList.add('ss-open'); buildItems(); render(''); list.style.display = 'block'; }
+            function closeList() { if (!open) return; open = false; wrap.classList.remove('ss-open'); list.style.display = 'none'; syncInputText(); }
+            function pick(idx) { sel.selectedIndex = idx; sel.dispatchEvent(new Event('change', { bubbles: true })); closeList(); }
+            input.addEventListener('focus', function () { openList(); input.select(); });
+            input.addEventListener('input', function () { render(input.value); });
+            input.addEventListener('blur', function () { closeList(); });
+            input.addEventListener('keydown', function (e) {
+                var visible = list.querySelectorAll('.ss-item');
+                if (e.key === 'ArrowDown') { e.preventDefault(); highlighted = Math.min(highlighted + 1, visible.length - 1); setHighlight(visible); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); highlighted = Math.max(highlighted - 1, 0); setHighlight(visible); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (highlighted >= 0 && visible[highlighted]) pick(Number(visible[highlighted].dataset.idx)); else { closeList(); input.blur(); } }
+                else if (e.key === 'Escape') { closeList(); input.blur(); }
+            });
+            function setHighlight(visible) { visible.forEach(function (d, i) { d.classList.toggle('ss-highlight', i === highlighted); if (i === highlighted) d.scrollIntoView({ block: 'nearest' }); }); }
+            buildItems(); syncInputText();
+        }
+        document.querySelectorAll('select.searchable-select').forEach(makeSearchableSelect);
+    })();
+    </script>
+}

@@ -1,0 +1,380 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model IEnumerable<PMS.Models.Wps>
+@{
+    Layout = null;
+    ViewData["Title"] = "WPS Log";
+    string FormatWeldProcess(string? value)
+    {
+        var v = value?.Trim();
+        if (string.IsNullOrEmpty(v)) return string.Empty;
+        return v.ToUpperInvariant() switch
+        {
+            "SAW" => "GTAW + SAW",
+            "SMAW" => "GTAW + SMAW",
+            "FCAW-GS" => "GTAW + FCAW-GS",
+            _ => v
+        };
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - PMS</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png">
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" asp-append-version="true">
+    <style>
+        .page { width:90%; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1); padding:20px; }
+        .page-title { color:#176d8a; margin:0 0 16px 0; padding-bottom:10px; border-bottom:2px solid #e6f6fa; font-size:2em; }
+        label { font-weight:600; color:#176d8a; font-size:.9rem; }
+        .form-control { padding:8px 12px; border:1px solid #cce7ef; border-radius:4px; background:#fff; color:#176d8a; font-size:.9rem; width:100%; box-sizing:border-box; }
+        .user-table th, .user-table td { font-size:.9rem; }
+        .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+        .form-group { display:flex; flex-direction:column; gap:6px; }
+        .form-control:focus { outline:none; border-color:#1f99be; box-shadow:0 0 0 2px rgba(31,153,190,.2); }
+        .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+        .btn { padding:8px 14px; border:none; border-radius:4px; cursor:pointer; font-weight:600; transition:.2s; }
+        .btn-primary { background:#1f99be; color:#fff; } .btn-primary:hover{ background:#176d8a; }
+        .btn-danger { background:#cc0000; color:#fff; } .btn-danger:hover{ background:#a30000; }
+        .btn-secondary { background:#7a9aa8; color:#fff; }
+        .btn-outline { background:#fff; color:#176d8a; border:1px solid #1f99be; }
+        .btn-outline:hover { background:#1f99be; color:#fff; }
+        .user-table { width:100%; border-collapse:collapse; margin-top:10px; }
+        .user-table th { background-color:#e6f6fa; color:#176d8a; padding:10px 12px; text-align:left; position:sticky; top:0; }
+        .user-table td { padding:10px 12px; border-bottom:1px solid #e6f6fa; color:#1a6d86; }
+        /* Pipe Class: allow wrapping and increase column width */
+        .user-table th.col-pipe-class, .user-table td.pipe-class {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            width: 360px;
+            max-width: 480px;
+        }
+
+        /* Service: allow wrapping inside the column */
+        .user-table th.col-service, .user-table td.service {
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            width: 160px;
+            max-width: 240px;
+        }
+
+        /* Match inline flash styling used on Edit Welder page */
+        .msg { margin:0 0 12px 0; font-weight:400; font-size:0.875rem; display:block; border:none; outline:none; box-shadow:none; background:transparent; }
+        .msg.text-danger { color:#cc0000; }
+        .msg-success { margin:0 0 12px 0; color:#27ae60; font-weight:400; font-size:0.875rem; display:block; border:none; outline:none; box-shadow:none; background:transparent; }
+
+        .row-actions { display:flex; gap:8px; }
+        .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:25px; }
+        .filter-bar input { flex:1 1 260px; }
+        .count { font-size:.8rem; color:#176d8a; }
+        .filter-actions { display:flex; gap:8px; align-items:center; }
+        .col-serial { width:30px; min-width:30px; font-weight:600; text-align:center; }
+        /* Narrower data columns for compact table */
+        .col-dia-range, td.dia-range { width:70px; max-width:70px; }
+        .col-thic-range, td.thic-range { width:70px; max-width:70px; }
+        /* Actions column (header + cells) */
+        .col-actions, td.row-actions { width:90px; max-width:90px; }
+        /* Make WPS column wider */
+        .col-wps, td.wps { width:220px; max-width:320px; }
+
+        /* Modal (match EditWelder.cshtml) */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center; }
+        .modal-content { background:#fff; padding:25px; border-radius:8px; width:90%; max-width:520px; max-height:80vh; overflow-y:auto; box-shadow:0 4px 20px rgba(0,0,0,0.15); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid #e6f6fa; }
+        .modal-title { color:#176d8a; font-size:1.3rem; margin:0; }
+        .close-modal { background:none; border:none; font-size:1.5rem; cursor:pointer; color:#176d8a; }
+        .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; padding-top:12px; border-top:1px solid #e6f6fa; }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_DashboardHeader")
+
+    <div class="page">
+        <h1 class="page-title">WPS Log</h1>
+
+        @if (TempData["Msg"] is string m && !string.IsNullOrWhiteSpace(m))
+        {
+            var isSuccessMsg = System.Text.RegularExpressions.Regex.IsMatch(m, "(successfully|saved|uploaded|updated|added)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var flashClass = isSuccessMsg ? "msg msg-success" : "msg text-danger";
+            <div id="topFlashMsg" class="@flashClass" role="status" aria-live="polite">@m</div>
+        }
+
+        <form asp-action="SaveWps" asp-controller="Home" method="post" id="wpsForm">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="err"></div>
+            <input type="hidden" id="WPS_ID" name="WPS_ID" />
+            <div class="grid">
+                <div class="form-group">
+                    <label for="WPS">WPS</label>
+                    <input class="form-control" id="WPS" name="WPS" maxlength="20" required />
+                </div>
+                <div class="form-group">
+                    <label for="Project_WPS">Project</label>
+                    <select class="form-control" id="Project_WPS" name="Project_WPS" asp-items="ViewBag.Projects">
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Weld_Process" class="control-label">Weld Process</label>
+                    <select id="Weld_Process" name="Weld_Process" class="form-control">
+                        <option value="">-- Select --</option>
+                        <option>GTAW</option>
+                        <option>GTAW + SMAW</option>
+                        <option>GTAW + SAW</option>
+                        <option>GTAW + FCAW-GS</option>
+                    </select>
+                    <span class="text-danger field-validation-valid" data-valmsg-for="Weld_Process" data-valmsg-replace="true"></span>
+                </div>
+                <div class="form-group">
+                    <label for="PWHT">PWHT</label>
+                    <select class="form-control" id="PWHT" name="PWHT">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Dia_Range">Dia Range</label>
+                    <input class="form-control" id="Dia_Range" name="Dia_Range" maxlength="150" />
+                </div>
+                <div class="form-group">
+                    <label for="Thickness_Range">Thickness Range</label>
+                    <input class="form-control" id="Thickness_Range" name="Thickness_Range" maxlength="150" />
+                </div>
+                <div class="form-group">
+                    <label for="Thickness_Range_From">Thickness From</label>
+                    <input class="form-control" id="Thickness_Range_From" name="Thickness_Range_From" type="number" step="0.001" />
+                </div>
+                <div class="form-group">
+                    <label for="Thickness_Range_To">Thickness To</label>
+                    <input class="form-control" id="Thickness_Range_To" name="Thickness_Range_To" type="number" step="0.001" />
+                </div>
+                <div class="form-group">
+                    <label for="WPS_P_NO">P NO</label>
+                    <input class="form-control" id="WPS_P_NO" name="WPS_P_NO" maxlength="20" />
+                </div>
+                <div class="form-group">
+                    <label for="WPS_Material">Material</label>
+                    <input class="form-control" id="WPS_Material" name="WPS_Material" maxlength="150" />
+                </div>
+                <div class="form-group">
+                    <label for="Electrode">Electrode</label>
+                    <input class="form-control" id="Electrode" name="Electrode" maxlength="20" />
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="WPS_Pipe_Class">Pipe Class</label>
+                    <textarea class="form-control" id="WPS_Pipe_Class" name="WPS_Pipe_Class" rows="3"></textarea>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="WPS_Service">Service</label>
+                    <textarea class="form-control" id="WPS_Service" name="WPS_Service" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" onclick="clearWpsForm()">Clear</button>
+                <button type="submit" class="btn btn-primary">Save WPS</button>
+            </div>
+        </form>
+
+        <div class="filter-bar">
+            <input id="searchBox" class="form-control" type="text" placeholder="Search WPS / Pipe Class / Material..." autocomplete="off" />
+            <div class="filter-actions">
+                <button id="downloadBtn" type="button" class="btn btn-outline">Download Excel</button>
+                <span id="rowCount" class="count"></span>
+            </div>
+        </div>
+
+        <table class="user-table" id="wpsTable">
+            <thead>
+                <tr>
+                    <th class="col-serial">S/N</th>
+                    <th class="col-wps">WPS</th>
+                    <th>Project</th>
+                    <th>Weld Process</th>
+                    <th>PWHT</th>
+                    <th class="col-dia-range">Dia Range</th>
+                    <th class="col-thic-range">Thic. Range</th>
+                    <th>Thic. From</th>
+                    <th>Thic. To</th>
+                    <th>P NO</th>
+                    <th>Material</th>
+                    <th>Electrode</th>
+                    <th class="col-pipe-class">Pipe Class</th>
+                    <th class="col-service">Service</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var w in Model)
+            {
+                <tr data-id="@w.WPS_ID">
+                    <td class="col-serial"></td>
+                    <td class="wps">@w.WPS</td>
+                    <td>@w.Project_WPS</td>
+                    <td>@FormatWeldProcess(w.Weld_Process)</td>
+                    <td>@(w.PWHT ? "Yes" : "No")</td>
+                    <td class="dia-range">@w.Dia_Range</td>
+                    <td class="thic-range">@w.Thickness_Range</td>
+                    <td>@w.Thickness_Range_From</td>
+                    <td>@w.Thickness_Range_To</td>
+                    <td>@w.WPS_P_NO</td>
+                    <td>@w.WPS_Material</td>
+                    <td>@w.Electrode</td>
+                    <td class="pipe-class">@w.WPS_Pipe_Class</td>
+                    <td class="service">@w.WPS_Service</td>
+                    <td class="row-actions">
+                        <button type="button" class="btn btn-primary" onclick="editWps(this)">Edit</button>
+                        <button type="button" class="btn btn-danger delete-wps" data-wps="@w.WPS" data-id="@w.WPS_ID">Del</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @await Html.PartialAsync("_DashboardFooter")
+
+    <form id="deleteWpsForm" method="post" asp-action="DeleteWps" asp-controller="Home" style="display:none;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="deleteWpsId" />
+    </form>
+
+    <div class="modal" id="confirmDeleteWpsModal" role="dialog" aria-modal="true" aria-labelledby="wpsDeleteTitle" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="wpsDeleteTitle">Confirm Delete</h2>
+                <button class="close-modal" type="button" aria-label="Close" onclick="closeWpsDeleteModal()">&times;</button>
+            </div>
+            <p id="confirmDeleteWpsMessage" style="color:#176d8a; margin:0 0 16px 0;"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closeWpsDeleteModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmWpsDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Ensure any flash message is focused and visible on load (match Edit Welder UX)
+        document.addEventListener('DOMContentLoaded', function () {
+            try {
+                const msg = document.getElementById('topFlashMsg');
+                if (!msg) return;
+                msg.tabIndex = -1;
+                msg.focus();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (e) { /* ignore */ }
+        });
+
+        function byId(id){ return document.getElementById(id); }
+        function clearWpsForm() {
+            ['WPS_ID','WPS','Project_WPS','Weld_Process','PWHT','Dia_Range','Thickness_Range','Thickness_Range_From','Thickness_Range_To','WPS_P_NO','WPS_Material','Electrode','WPS_Service','WPS_Pipe_Class']
+              .forEach(i=>{ const el=byId(i); if(el){ el.value=''; }});
+            byId('PWHT').value='false';
+            // Default project already pre-selected on first load via server; keep that if clearing
+            if (byId('Project_WPS').querySelector('option[selected]')) {
+                byId('Project_WPS').value = byId('Project_WPS').querySelector('option[selected]').value;
+            }
+            window.scrollTo({top:0, behavior:'smooth'});
+            byId('WPS')?.focus();
+        }
+        function editWps(btn) {
+            const tr = btn.closest('tr');
+            if(!tr) return;
+            const tds = tr.children;
+            // With S/N column index shift: 0 SN,1 WPS,2 Project,3 Weld Process,4 PWHT,5 Dia Range,6 Thic Range,7 Thic From,8 Thic To,9 P NO,10 Material,11 Electrode,12 Pipe Class,13 Service
+            byId('WPS_ID').value = tr.dataset.id || '';
+            byId('WPS').value = (tds[1]?.textContent || '').trim();
+            byId('Project_WPS').value = (tds[2]?.textContent || '').trim();
+            byId('Weld_Process').value = (tds[3]?.textContent || '').trim();
+            byId('PWHT').value = ((tds[4]?.textContent || '').trim().toLowerCase() === 'yes') ? 'true' : 'false';
+            byId('Dia_Range').value = (tds[5]?.textContent || '').trim();
+            byId('Thickness_Range').value = (tds[6]?.textContent || '').trim();
+            byId('Thickness_Range_From').value = (tds[7]?.textContent || '').trim();
+            byId('Thickness_Range_To').value = (tds[8]?.textContent || '').trim();
+            byId('WPS_P_NO').value = (tds[9]?.textContent || '').trim();
+            byId('WPS_Material').value = (tds[10]?.textContent || '').trim();
+            byId('Electrode').value = (tds[11]?.textContent || '').trim();
+            byId('WPS_Pipe_Class').value = (tds[12]?.textContent || '').trim();
+            byId('WPS_Service').value = (tds[13]?.textContent || '').trim();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(()=> byId('WPS')?.focus(), 250);
+        }
+
+        function renumber(){
+            let i=1;
+            document.querySelectorAll('#wpsTable tbody tr').forEach(tr=>{
+                if(tr.style.display==='none') return;
+                const c = tr.querySelector('.col-serial');
+                if(c) c.textContent = i++;
+            });
+        }
+
+        // Simple client-side search (WPS, Pipe Class, Material)
+        const searchInput = byId('searchBox');
+        const table = byId('wpsTable');
+        const rowCountEl = byId('rowCount');
+        function applyFilter(){
+            const q = (searchInput.value || '').trim().toLowerCase();
+            let shown=0; let total=0;
+            table.querySelectorAll('tbody tr').forEach(tr=>{
+                total++;
+                const cells = tr.children;
+                const wps = (cells[1]?.textContent||'').toLowerCase();
+                const pipeClass = (cells[12]?.textContent||'').toLowerCase();
+                const material = (cells[10]?.textContent||'').toLowerCase();
+                const match = !q || wps.includes(q) || pipeClass.includes(q) || material.includes(q);
+                tr.style.display = match ? '' : 'none';
+                if(match) shown++;
+            });
+            rowCountEl.textContent = `${shown}/${total}`;
+            renumber();
+        }
+        searchInput?.addEventListener('input', applyFilter);
+        applyFilter();
+
+        byId('downloadBtn')?.addEventListener('click', () => {
+            const q = encodeURIComponent(searchInput.value.trim());
+            const url = q ? `/Home/ExportWps?q=${q}` : '/Home/ExportWps';
+            window.location = url;
+        });
+
+        // Delete confirm via modal (match EditWelder.cshtml UX)
+        let pendingWps = null;
+        function closeWpsDeleteModal(){
+            const modal = document.getElementById('confirmDeleteWpsModal');
+            if (modal) { modal.style.display='none'; modal.setAttribute('aria-hidden','true'); }
+            pendingWps = null;
+        }
+        function confirmWpsDelete(){
+            const form = document.getElementById('deleteWpsForm');
+            const idInput = document.getElementById('deleteWpsId');
+            if (!pendingWps || !form || !idInput) return;
+            idInput.value = pendingWps.id;
+            closeWpsDeleteModal();
+            form.submit();
+        }
+        function openWpsDeleteModal(id, name){
+            pendingWps = { id };
+            const msgEl = document.getElementById('confirmDeleteWpsMessage');
+            if (msgEl) msgEl.textContent = `Are you sure you want to delete WPS "${name}"?`;
+            const modal = document.getElementById('confirmDeleteWpsModal');
+            if (modal){ modal.style.display='flex'; modal.setAttribute('aria-hidden','false'); }
+        }
+        document.addEventListener('click', function(ev){
+            const btn = ev.target?.closest('.delete-wps');
+            if (!btn) return;
+            ev.preventDefault();
+            const id = btn.getAttribute('data-id');
+            if (!id) return;
+            const name = btn.getAttribute('data-wps') || btn.closest('tr')?.querySelector('.wps')?.textContent || '';
+            openWpsDeleteModal(id, name.trim());
+        });
+        window.addEventListener('click', function (event) {
+            const modal = document.getElementById('confirmDeleteWpsModal');
+            if (event.target === modal) closeWpsDeleteModal();
+        });
+
+        renumber();
+    </script>
+</body>
+</html>

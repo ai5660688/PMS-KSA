@@ -1,0 +1,388 @@
+/* DailyWelding specific CSS - initially identical to DailyFitup.css; keep separate for future overrides */
+@import url('/css/DailyFitup.css');
+
+/* Force light form controls in header (prevents black dropdown backgrounds) */
+#dailywelding-root .fitup-header { color-scheme: light; }
+#dailywelding-root .fitup-header select,
+#dailywelding-root .fitup-header option {
+  background: #fff !important;
+  color: #176d8a !important;
+}
+#dailywelding-root .fitup-header select option:checked,
+#dailywelding-root .fitup-header select option:hover {
+  background: #e6f6fa !important;
+}
+
+/* Column width overrides for Daily Welding view
+   Increase width for RFI and ROOT/FILL/CAP/IP columns as requested.
+*/
+@media all {
+  /* RFI No. – match Welding Report column width (col-frep: 95px) */
+  th.col-rfi, td.col-rfi { min-width: 95px; }
+  td.col-rfi select, td.col-rfi select.rfi-select { min-width: 95px; }
+
+  /* Root / Fill / Cap columns — give slightly wider selects to show welder symbols */
+  th.col-roota, td.col-roota,
+  th.col-rootb, td.col-rootb,
+  th.col-filla, td.col-filla,
+  th.col-fillb, td.col-fillb,
+  th.col-capa, td.col-capa,
+  th.col-capb, td.col-capb {
+    min-width: 110px;
+  }
+
+  /* IP or T — compact but wider than default */
+  th.col-iport, td.col-iport { min-width: 80px; }
+
+  /* Ensure inputs/selects in these columns expand to fill the cell */
+  td.col-roota select, td.col-rootb select,
+  td.col-filla select, td.col-fillb select,
+  td.col-capa select, td.col-capb select,
+  td.col-iport select,
+  td.col-rfi select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Ensure Daily Welding uses the same row sizing as Daily Fit-up by matching key table/input sizing rules
+   This overrides only the properties that affect row height so the rest of DailyFitup styles remain inherited. */
+@media all {
+  /* Match generic cell padding and typography used by DailyFitup */
+  table.fitup th,
+  table.fitup td {
+    padding: 4px 6px; /* same as DailyFitup.css */
+    text-align: center;
+    white-space: nowrap;
+    font-size: 14px; /* align with table.fitup base size */
+    line-height: 1.25;
+    vertical-align: middle;
+  }
+
+  /* Header height / padding should match DailyFitup's header rule */
+  table.fitup thead th {
+    padding: 8px 6px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* Inputs/selects inside rows should not be forced taller here — use Fitup defaults */
+  table.fitup tbody td input,
+  table.fitup tbody td select {
+    padding: 2px 3px;
+    font-size: 13px;
+    height: auto;
+    min-height: unset;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  /* Reduce the visible table height for Daily Welding to be more compact than fit-up */
+  /* Set an explicit max-height (pixels) so layout is consistent across viewports */
+  .table-wrapper {
+    max-height: 380px; /* reduced to make Daily Welding table shorter */
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  /* Keep scroll-sync slightly larger to accommodate header + controls, but limited */
+  .scroll-sync { max-height: 375px; }
+
+  /* Bottom scroll track should match Fitup but slightly thinner for compact view */
+  .bottom-scroll { height: 12px; }
+  .bottom-scroll .bottom-scroll-inner { height: 12px; }
+
+  /* Restore header/toolbar spacing to Fitup defaults (slightly tightened globally for this page) */
+  #dailywelding-root .fitup-header .row,
+  #dailywelding-root .toolbar {
+    gap: 2px; /* reduced from 10px to bring labels and data boxes closer */
+  }
+
+  /* Override label/input margins locally for this page to decrease space between label text and inputs/selects */
+  #dailywelding-root .fitup-header label {
+    margin-right: 2px; /* tighten label spacing */
+  }
+  #dailywelding-root .fitup-header select,
+  #dailywelding-root .fitup-header input,
+  #dailywelding-root .fitup-header button {
+    margin: 2px 6px 2px 0; /* slightly reduced horizontal gap */
+  }
+
+  /* Slightly tighter ref-box spacing in the header */
+  #dailywelding-root .ref-box { margin: 2px 6px 2px 0; }
+
+  /* Ensure the Weld Type panel matches DailyFitup spacing exactly (scope to page root for safety) */
+  #dailywelding-root .weld-filters,
+  .weld-filters {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: #fff8eb;
+    border: 1.5px solid #e6d9c3;
+    border-radius: 6px;
+    padding: 4px 8px 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-size: 11px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px; /* match DailyFitup.css */
+    align-items: center;
+    z-index: 20;
+    pointer-events: auto;
+    width: clamp(300px, 42vw, 500px);
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Force the exact label/checkbox spacing used in DailyFitup so items don't appear too spaced or wrap prematurely */
+  #dailywelding-root .weld-filters strong,
+  .weld-filters strong { font-size: 13px; color: #176d8a; letter-spacing: 0.5px; margin: 0 6px 0 0; }
+  #dailywelding-root .weld-filters label,
+  .weld-filters label {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px; /* tight gap between checkbox and text */
+    margin: 0;
+    font-weight: 600;
+    font-size: 12px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+  /* ensure checkboxes themselves have no extra margin and use same scale */
+  #dailywelding-root .weld-filters input[type='checkbox'],
+  .weld-filters input[type='checkbox'] {
+    margin: 0;
+    transform: scale(1);
+    width: auto;
+    height: auto;
+    vertical-align: middle;
+  }
+  #dailywelding-root .weld-filters .wf-actions,
+  .weld-filters .wf-actions { display: inline-flex; gap: 4px; margin-left: auto; margin-top: 0; }
+
+  /* Keep checkbox cell spacing in line with Fitup */
+  .chk-cell { padding: 4px 6px; }
+}
+
+/* Responsive adjustments to make Weld Type behavior match DailyFitup exactly */
+@media (max-width: 1200px) {
+  /* Mirror DailyFitup: make weld-filters flow with header on medium/smaller screens */
+  #dailywelding-root .weld-filters,
+  .weld-filters {
+    position: static;
+    width: 100%;
+    order: 3;
+    margin-top: 6px;
+    z-index: auto;
+  }
+  /* show filter toggle same as fitup */
+  .filter-toggle-btn { display: inline-block; }
+}
+
+@media (max-width: 768px) {
+  /* In tighter layouts, keep weld-filters full width as part of header stack */
+  #dailywelding-root .weld-filters,
+  .weld-filters {
+    width: 100%;
+    order: 3;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Small screens: use grid layout exactly like DailyFitup to avoid premature wrapping */
+  #dailywelding-root .weld-filters,
+  .weld-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 4px 8px;
+  }
+  #dailywelding-root .weld-filters strong, .weld-filters strong { grid-column: 1 / -1; }
+  #dailywelding-root .weld-filters .wf-actions, .weld-filters .wf-actions { grid-column: 1 / -1; justify-content: flex-start; margin-left: 0; }
+}
+
+@media (max-width: 520px) {
+  /* Tweak padding for very small screens */
+  #dailywelding-root .weld-filters,
+  .weld-filters { padding: 4px 6px; }
+}
+
+/* Tacker selects responsive layout to avoid overlap on narrow windows */
+.tacker-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.tacker-item { display:flex; gap:6px; align-items:center; min-width:0; }
+.tacker-item label { white-space:nowrap; margin-right:4px; font-weight:600; }
+.tacker-select { min-width:90px; max-width:150px; width:120px; box-sizing:border-box; }
+
+@media (max-width: 920px) {
+  .tacker-select { width:100px; }
+}
+
+@media (max-width: 640px) {
+  /* switch to a 2-column grid for tacker items to preserve space */
+  .tacker-row { display:grid; grid-template-columns: repeat(2, 1fr); gap:6px; align-items:center; }
+  .tacker-item { justify-content:flex-start; }
+  .tacker-item label { white-space:nowrap; }
+  .tacker-select { width:100%; min-width:60px; }
+}
+
+@media (max-width: 420px) {
+  /* Very small screens: stack vertically and allow labels to hide if desired */
+  .tacker-row { grid-template-columns: 1fr; }
+  .tacker-item { width:100%; }
+  .tacker-item label { display:inline-block; width:28%; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; }
+  .tacker-select { width:72%; }
+}
+
+/* Ensure per-row tacker selects (ROOT/FILL/CAP columns) use same custom scrollbar colors as header */
+td.col-roota select, td.col-rootb select,
+td.col-filla select, td.col-fillb select,
+td.col-capa select, td.col-capb select {
+  scrollbar-color: #1f99be #fff8eb; /* thumb, track */
+  scrollbar-width: thin;
+}
+/* Apply the same scrollbar styling to RFI No. select */
+td.col-rfi select, td.col-rfi select.rfi-select {
+  scrollbar-color: #1f99be #fff8eb; /* thumb, track */
+  scrollbar-width: thin;
+}
+td.col-roota select::-webkit-scrollbar,
+td.col-rootb select::-webkit-scrollbar,
+td.col-filla select::-webkit-scrollbar,
+td.col-fillb select::-webkit-scrollbar,
+td.col-capa select::-webkit-scrollbar,
+td.col-capb select::-webkit-scrollbar,
+/* include RFI */
+td.col-rfi select::-webkit-scrollbar {
+  width: 12px;
+}
+td.col-roota select::-webkit-scrollbar-track,
+td.col-rootb select::-webkit-scrollbar-track,
+td.col-filla select::-webkit-scrollbar-track,
+td.col-fillb select::-webkit-scrollbar-track,
+td.col-capa select::-webkit-scrollbar-track,
+td.col-capb select::-webkit-scrollbar-track,
+/* include RFI */
+td.col-rfi select::-webkit-scrollbar-track {
+  background: #fff8eb;
+}
+td.col-roota select::-webkit-scrollbar-thumb,
+td.col-rootb select::-webkit-scrollbar-thumb,
+td.col-filla select::-webkit-scrollbar-thumb,
+td.col-fillb select::-webkit-scrollbar-thumb,
+td.col-capa select::-webkit-scrollbar-thumb,
+td.col-capb select::-webkit-scrollbar-thumb,
+/* include RFI */
+td.col-rfi select::-webkit-scrollbar-thumb {
+  background: #1f99be;
+  border-radius: 6px;
+  border: 3px solid #fff8eb;
+}
+td.col-roota select::-webkit-scrollbar-thumb:hover,
+td.col-rootb select::-webkit-scrollbar-thumb:hover,
+td.col-filla select::-webkit-scrollbar-thumb:hover,
+td.col-fillb select::-webkit-scrollbar-thumb:hover,
+td.col-capa select::-webkit-scrollbar-thumb:hover,
+td.col-capb select::-webkit-scrollbar-thumb:hover,
+/* include RFI */
+td.col-rfi select::-webkit-scrollbar-thumb:hover {
+  background: #176d8a;
+}
+
+/* DailyWelding specific styles */
+
+@keyframes pms-logo-spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Ensure native select arrow is visible and clickable for WPS dropdowns */
+select.wps-select {
+  appearance: auto;
+  -webkit-appearance: auto;
+  -moz-appearance: menulist;
+  background-image: none !important; /* cancel any custom arrow from imported CSS */
+  padding-right: 18px; /* space for native arrow */
+  cursor: pointer;
+}
+/* Make sure the cell doesn't hide the arrow due to overflow */
+td.col-wps { overflow: visible; }
+/* Center the text inside Remarks input in Daily Welding */
+@media all {
+  td.col-remarks input[data-name="Remarks"] {
+    text-align: center;
+  }
+}
+
+/* Center the text inside Remarks input in Daily Welding with strong specificity */
+@media all {
+  /* Increase specificity and force override against imported DailyFitup.css */
+  #dailywelding-root table.fitup td.col-remarks input[data-name="Remarks"],
+  table.fitup td.col-remarks input[data-name="Remarks"] {
+    text-align: center !important;
+  }
+}
+
+/* Reduce the width of the header "Welding Report (WS/FW/TH)" input on Daily Welding */
+@media all {
+  #dailywelding-root #weldingReportCombinedInput {
+    width: 140px; /* was 230px via .w230 */
+  }
+}
+
+/* Reduce the width of the header Welding Date and Actual Date inputs on Daily Welding */
+@media all {
+  #dailywelding-root #fitupDateInput,
+  #dailywelding-root #actualDateInput {
+    width: 163px; /* was w180 */
+  }
+}
+
+/* Do not show red highlight for rows locked due to missing DFR FITUP_DATE */
+#dailywelding-root table.fitup tr.locked.missing-fitup td,
+table.fitup tr.locked.missing-fitup td {
+  background: inherit !important;
+}
+#dailywelding-root table.fitup tr.locked.missing-fitup:nth-child(odd) td,
+table.fitup tr.locked.missing-fitup:nth-child(odd) td {
+  background: #fffdf9 !important;
+}
+#dailywelding-root table.fitup tr.locked.missing-fitup:nth-child(even) td,
+table.fitup tr.locked.missing-fitup:nth-child(even) td {
+  background: #f7fbfc !important;
+}
+#dailywelding-root table.fitup tr.locked.missing-fitup:hover td,
+table.fitup tr.locked.missing-fitup:hover td {
+  background: #e6f6fa !important;
+}
+/* Stronger override: missing-fitup rows should keep normal zebra/hover colors, not red locked */
+#fitupTable tr.locked.missing-fitup td,
+#dwr-table-fragment #fitupTable tr.locked.missing-fitup td,
+table#fitupTable tr.locked.missing-fitup td {
+  background: inherit !important;
+}
+#fitupTable tr.locked.missing-fitup:nth-child(odd) td,
+#dwr-table-fragment #fitupTable tr.locked.missing-fitup:nth-child(odd) td,
+table#fitupTable tr.locked.missing-fitup:nth-child(odd) td {
+  background: #fffdf9 !important;
+}
+#fitupTable tr.locked.missing-fitup:nth-child(even) td,
+#dwr-table-fragment #fitupTable tr.locked.missing-fitup:nth-child(even) td,
+table#fitupTable tr.locked.missing-fitup:nth-child(even) td {
+  background: #f7fbfc !important;
+}
+#fitupTable tr.locked.missing-fitup:hover td,
+#dwr-table-fragment #fitupTable tr.locked.missing-fitup:hover td,
+table#fitupTable tr.locked.missing-fitup:hover td {
+  background: #e6f6fa !important;
+}
+
+/* Highlight editable Welding Report inputs in green */
+@media all {
+  #dwr-table-fragment #fitupTable td.col-frep input:enabled,
+  #fitupTable td.col-frep input:enabled,
+  table#fitupTable td.col-frep input:enabled {
+    background: #e8f7e2 !important;
+    border-color: #9ad88a !important;
+  }
+}

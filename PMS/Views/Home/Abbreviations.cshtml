@@ -1,0 +1,400 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+    ViewData["Title"] = "Abbreviations";
+    var ipTList = ViewBag.IpTList as IEnumerable<PMS.Models.PmsIpT> ?? Enumerable.Empty<PMS.Models.PmsIpT>();
+    var jAddList = ViewBag.JAddList as IEnumerable<PMS.Models.PmsJAdd> ?? Enumerable.Empty<PMS.Models.PmsJAdd>();
+    var locationList = ViewBag.LocationList as IEnumerable<PMS.Models.PmsLocation> ?? Enumerable.Empty<PMS.Models.PmsLocation>();
+    var weldTypeList = ViewBag.WeldTypeList as IEnumerable<PMS.Models.PmsWeldType> ?? Enumerable.Empty<PMS.Models.PmsWeldType>();
+    var projectNo = (int)(ViewBag.ProjectNo ?? 0);
+    var projects = ViewBag.Projects as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>PMS - Abbreviations</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png">
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" asp-append-version="true">
+    <style>
+        .page { width:92%; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1); padding:20px; }
+        .page-title { color:#176d8a; font-size:2em; margin:0 0 16px 0; padding-bottom:10px; border-bottom:2px solid #e6f6fa; }
+        .user-table { width:100%; border-collapse:collapse; margin-top:12px; }
+        .user-table th { background-color:#e6f6fa; color:#176d8a; padding:10px 12px; text-align:left; position:sticky; top:0; z-index:1; }
+        .user-table td { padding:10px 12px; border-bottom:1px solid #e6f6fa; color:#1a6d86; }
+        .user-table th, .user-table td { font-size:.9rem; }
+
+        /* ── Tabs ── */
+        .tabs { display:flex; gap:0; margin-bottom:0; border-bottom:2px solid #e6f6fa; }
+        .tab-btn { padding:10px 20px; cursor:pointer; background:none; border:none; font-weight:600; font-size:1rem;
+                   color:#7a9aa8; border-bottom:3px solid transparent; transition:.2s; }
+        .tab-btn:hover { color:#176d8a; }
+        .tab-btn.active { color:#176d8a; border-bottom-color:#1f99be; }
+        .tab-panel { display:none; padding-top:16px; }
+        .tab-panel.active { display:block; }
+
+        .table-wrap { max-height:65vh; overflow:auto; }
+        .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+        .filter-bar input { flex:1 1 260px; }
+        .search { padding:6px 10px; border:1px solid #cce7ef; border-radius:4px; color:#176d8a; font-size:.9rem; }
+        .count { font-size:.8rem; color:#176d8a; }
+        .btn-export { padding:6px 14px; background:#176d8a; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:.9rem; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
+        .btn-export:hover { background:#125a6e; }
+
+        /* ── Project selector toolbar ── */
+        .project-bar { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+        .project-bar label { margin:0; white-space:nowrap; font-weight:600; color:#176d8a; }
+        .project-bar select { min-width:350px; }
+        .w350 { width:350px; max-width:100%; }
+
+        /* ── Searchable select dropdown widget ── */
+        .ss-wrap { position:relative; display:inline-block; vertical-align:middle; }
+        .ss-wrap.w350 { width:350px; min-width:350px; }
+        .ss-input { width:100%; box-sizing:border-box; cursor:pointer; padding:6px 10px; border:1px solid #cce7ef; border-radius:4px; background:#fff; color:#176d8a; font-family:inherit; font-size:.95rem; line-height:1.4; }
+        .ss-input:focus { cursor:text; outline:none; border-color:#1f99be; box-shadow:0 0 2px rgba(31,153,190,.2); }
+        .ss-list { display:none; position:absolute; left:0; right:0; top:100%; z-index:200; background:#fff; border:1px solid #1f99be; border-top:none; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,.12); }
+        .ss-item { padding:6px 10px; cursor:pointer; font-size:.9rem; color:#176d8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ss-item:hover, .ss-item.ss-highlight { background:#e6f6fa; }
+        .ss-item.ss-active { font-weight:700; }
+        .ss-empty { padding:6px 10px; font-size:.85rem; color:#999; font-style:italic; }
+        .ss-open .ss-input { border-radius:4px 4px 0 0; border-color:#1f99be; }
+        .ss-list::-webkit-scrollbar { width:10px; }
+        .ss-list::-webkit-scrollbar-track { background:#f0fbff; border-radius:8px; }
+        .ss-list::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; border:2px solid #f0fbff; }
+        .ss-list::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+        .ss-list { scrollbar-width:thin; scrollbar-color:#176d8a #f0fbff; }
+
+        .table-wrap::-webkit-scrollbar { width:10px; height:10px; }
+        .table-wrap::-webkit-scrollbar-track { background:#f0f4f8; border-radius:8px; }
+        .table-wrap::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; border:2px solid #f0f4f8; }
+        .table-wrap::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+        .table-wrap { scrollbar-width:thin; scrollbar-color:#176d8a #f0f4f8; }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_DashboardHeader")
+
+    <div class="page">
+        <h1 class="page-title">Abbreviations</h1>
+
+        <!-- ═══ Toolbar ═══ -->
+        <div class="project-bar">
+            <label for="projectSelect">Project No:</label>
+            <select id="projectSelect" class="search w350" title="Project No">
+                @foreach (var p in projects)
+                {
+                    if ((int)p.Value == projectNo)
+                    {
+                        <option value="@p.Value" selected>@p.Text</option>
+                    }
+                    else
+                    {
+                        <option value="@p.Value">@p.Text</option>
+                    }
+                }
+            </select>
+            <input id="globalSearch" class="search" placeholder="Search (all columns)" autocomplete="off" />
+            <a id="btnExportExcel" class="btn-export" title="Download as Excel">
+                &#128229; Export Excel
+            </a>
+        </div>
+
+        <!-- ═══ Tabs ═══ -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="tabIpT">IP/T Type</button>
+            <button class="tab-btn" data-tab="tabJAdd">Joint Addition</button>
+            <button class="tab-btn" data-tab="tabLocation">Location</button>
+            <button class="tab-btn" data-tab="tabWeldType">Weld Type</button>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 1 – IP/T Type  (PMS_IP_T_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabIpT" class="tab-panel active">
+            <div class="table-wrap">
+                <table class="user-table" id="tblIpT">
+                    <thead><tr><th>ID</th><th>Project IP/T Type</th><th>Notes</th><th>Project No</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in ipTList)
+                    {
+                        <tr>
+                            <td>@r.IP_T_ID</td>
+                            <td>@r.P_IP_T_List</td>
+                            <td>@r.IP_T_Notes</td>
+                            <td>@r.IP_T_Project_No</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 2 – Joint Addition  (PMS_J_Add_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabJAdd" class="tab-panel">
+            <div class="table-wrap">
+                <table class="user-table" id="tblJAdd">
+                    <thead><tr><th>ID</th><th>Project Joint Addition</th><th>Notes</th><th>Project No</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in jAddList)
+                    {
+                        <tr>
+                            <td>@r.Add_ID</td>
+                            <td>@r.P_J_Add</td>
+                            <td>@r.Add_Notes</td>
+                            <td>@r.Add_Project_No</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 3 – Location  (PMS_Location_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabLocation" class="tab-panel">
+            <div class="table-wrap">
+                <table class="user-table" id="tblLocation">
+                    <thead><tr><th>ID</th><th>Project Location</th><th>Notes</th><th>Project No</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in locationList)
+                    {
+                        <tr>
+                            <td>@r.LO_ID</td>
+                            <td>@r.P_Location</td>
+                            <td>@r.LO_Notes</td>
+                            <td>@r.LO_Project_No</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 4 – Weld Type  (PMS_Weld_Type_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabWeldType" class="tab-panel">
+            <div class="table-wrap">
+                <table class="user-table" id="tblWeldType">
+                    <thead><tr><th>ID</th><th>Project Weld Type</th><th>Default</th><th>PROG Default</th><th>Notes</th><th>Project
+                    <tbody>
+                    @foreach (var r in weldTypeList)
+                    {
+                        <tr>
+                            <td>@r.W_Type_ID</td>
+                            <td>@r.P_Weld_Type</td>
+                            <td>@(r.Default_Value ? "Yes" : "No")</td>
+                            <td>@(r.PROG_Default_Value ? "Yes" : "No")</td>
+                            <td>@r.W_Notes</td>
+                            <td>@r.W_Project_No</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_DashboardFooter")
+
+    <script>
+        function byId(id) { return document.getElementById(id); }
+
+        // ══════════════════════════════════════════════════════════
+        //  Searchable select widget
+        // ══════════════════════════════════════════════════════════
+        function makeSearchableSelect(sel) {
+            if (!sel || sel.dataset.searchable) return;
+            sel.dataset.searchable = '1';
+            sel.style.display = 'none';
+            var wrap = document.createElement('div');
+            wrap.className = 'ss-wrap';
+            if (sel.classList.contains('w350')) wrap.classList.add('w350');
+            sel.parentNode.insertBefore(wrap, sel);
+            wrap.appendChild(sel);
+
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'ss-input';
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('spellcheck', 'false');
+            input.placeholder = 'Search project...';
+            wrap.appendChild(input);
+
+            var list = document.createElement('div');
+            list.className = 'ss-list';
+            wrap.appendChild(list);
+
+            var items = [];
+            var highlighted = -1;
+            var open = false;
+
+            function buildItems() {
+                items = [];
+                Array.from(sel.options).forEach(function (opt) {
+                    items.push({ value: opt.value, text: opt.text || opt.value });
+                });
+            }
+            function syncInputText() {
+                var idx = sel.selectedIndex;
+                input.value = idx >= 0 && sel.options[idx] ? (sel.options[idx].text || sel.options[idx].value) : '';
+            }
+            function render(filter) {
+                list.innerHTML = '';
+                highlighted = -1;
+                var lc = (filter || '').toLowerCase();
+                var count = 0;
+                items.forEach(function (item, i) {
+                    if (lc && !(item.text || '').toLowerCase().includes(lc)) return;
+                    var div = document.createElement('div');
+                    div.className = 'ss-item';
+                    div.textContent = item.text;
+                    div.dataset.idx = String(i);
+                    if (item.value === sel.value) div.classList.add('ss-active');
+                    div.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        pick(i);
+                    });
+                    list.appendChild(div);
+                    count++;
+                });
+                if (count === 0) {
+                    var empty = document.createElement('div');
+                    empty.className = 'ss-empty';
+                    empty.textContent = 'No match';
+                    list.appendChild(empty);
+                }
+            }
+            function pick(idx) {
+                if (idx < 0 || idx >= items.length) return;
+                sel.value = items[idx].value;
+                syncInputText();
+                closeList();
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            function showList() {
+                if (open) return;
+                open = true;
+                render(input.value !== (items[sel.selectedIndex]?.text || '') ? input.value : '');
+                list.style.display = 'block';
+                wrap.classList.add('ss-open');
+            }
+            function closeList() {
+                open = false;
+                list.style.display = 'none';
+                wrap.classList.remove('ss-open');
+                highlighted = -1;
+            }
+            function highlightItem(dir) {
+                var visible = list.querySelectorAll('.ss-item');
+                if (!visible.length) return;
+                if (dir === 'down') highlighted = highlighted < visible.length - 1 ? highlighted + 1 : 0;
+                else highlighted = highlighted > 0 ? highlighted - 1 : visible.length - 1;
+                visible.forEach(function (el, i) { el.classList.toggle('ss-highlight', i === highlighted); });
+                if (visible[highlighted]) visible[highlighted].scrollIntoView({ block: 'nearest' });
+            }
+            input.addEventListener('focus', function () {
+                buildItems();
+                input.select();
+                showList();
+            });
+            input.addEventListener('input', function () {
+                buildItems();
+                showList();
+                render(input.value);
+            });
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (!open) { showList(); render(''); }
+                    highlightItem('down');
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    highlightItem('up');
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (open && highlighted >= 0) {
+                        var visible = list.querySelectorAll('.ss-item');
+                        if (visible[highlighted]) {
+                            var idx = parseInt(visible[highlighted].dataset.idx, 10);
+                            pick(idx);
+                        }
+                    }
+                } else if (e.key === 'Escape') {
+                    syncInputText();
+                    closeList();
+                    input.blur();
+                } else if (e.key === 'Tab') {
+                    syncInputText();
+                    closeList();
+                }
+            });
+            input.addEventListener('blur', function () {
+                setTimeout(function () {
+                    if (!wrap.contains(document.activeElement)) {
+                        syncInputText();
+                        closeList();
+                    }
+                }, 150);
+            });
+            buildItems();
+            syncInputText();
+        }
+
+        // ══════════════════════════════════════════════════════════
+        //  Project dropdown → searchable + reload on change
+        // ══════════════════════════════════════════════════════════
+        var projectSelect = byId('projectSelect');
+        makeSearchableSelect(projectSelect);
+        projectSelect.addEventListener('change', function () {
+            var val = (projectSelect.value || '').trim();
+            var url = new URL(window.location.href);
+            if (val) url.searchParams.set('projectNo', val); else url.searchParams.delete('projectNo');
+            window.location.href = url.toString();
+        });
+
+        // ══════════════════════════════════════════════════════════
+        //  Tabs
+        // ══════════════════════════════════════════════════════════
+        document.querySelectorAll('.tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+                document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+                btn.classList.add('active');
+                byId(btn.dataset.tab).classList.add('active');
+                applyGlobalSearch();
+            });
+        });
+
+        // ══════════════════════════════════════════════════════════
+        //  Global search (filters active tab's table)
+        // ══════════════════════════════════════════════════════════
+        var globalSearchInput = byId('globalSearch');
+        function applyGlobalSearch() {
+            var q = (globalSearchInput.value || '').trim().toLowerCase();
+            var activePanel = document.querySelector('.tab-panel.active');
+            if (!activePanel) return;
+            var tbl = activePanel.querySelector('.user-table');
+            if (!tbl) return;
+            tbl.querySelectorAll('tbody tr').forEach(function (tr) {
+                var text = tr.textContent.toLowerCase();
+                tr.style.display = (!q || text.indexOf(q) >= 0) ? '' : 'none';
+            });
+        }
+        function debounce(fn, ms) { var h; return function () { clearTimeout(h); h = setTimeout(fn, ms || 120); }; }
+        globalSearchInput.addEventListener('input', debounce(applyGlobalSearch, 120));
+        applyGlobalSearch();
+
+        // ══════════════════════════════════════════════════════════
+        //  Export Excel
+        // ══════════════════════════════════════════════════════════
+        byId('btnExportExcel').addEventListener('click', function () {
+            var pNo = (projectSelect.value || '').trim();
+            window.location.href = '/Home/ExportAbbreviationsExcel?projectNo=' + encodeURIComponent(pNo);
+        });
+    </script>
+</body>
+</html>

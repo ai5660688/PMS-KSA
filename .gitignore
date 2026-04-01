@@ -1,0 +1,24 @@
+﻿## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.pdb
+*.exe
+
+## Visual Studio
+.vs/
+*.rsuser
+launchSettings.json.user
+serviceDependencies.local.json.user
+
+## NuGet
+packages/
+*.nupkg
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store

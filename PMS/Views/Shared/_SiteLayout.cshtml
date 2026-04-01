@@ -1,0 +1,36 @@
+@{
+    var title = ViewData["Title"] as string ?? "PMS";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMS - @title</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png">
+    <link rel="stylesheet" href="~/css/ContactUsStyle.css">
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+    <h1>
+        <img src="~/img/PMS_logo.png" alt="Logo" class="main-logo">
+    </h1>
+
+    <div class="container-wrapper">
+        @RenderBody()
+    </div>
+
+    <div class="footer">
+        <div class="footer-center">
+            This system is strictly restricted to authorized users only.<br>
+            © 2025 Piping Management System. All rights reserved.
+        </div>
+        <div class="footer-right">
+            <img src="~/img/work-smarter-not-harder.jpg?v=3" alt="Logo" class="footer-logo" />
+        </div>
+    </div>
+
+    <script src="~/js/site.js"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,39 @@
+﻿body {
+    font-family: Calibri, Arial, Helvetica, sans-serif;
+    background-color: #fff8eb;
+    margin: 0;
+    padding: 20px;
+    color: rgb(26, 109, 134);
+}
+
+.welcome-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    margin-top: 40px;
+}
+
+.project-image {
+    max-width: 90%;
+    max-height: 60vh;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(31,153,190,0.13);
+}
+
+.welcome-message {
+    text-align: center;
+    margin-top: 30px;
+}
+
+    .welcome-message h2 {
+        font-size: 3em;
+        color: #1f99be;
+        margin-bottom: 10px;
+    }
+
+    .welcome-message h3 {
+        font-size: 2.2em;
+        color: #176d8a;
+    }

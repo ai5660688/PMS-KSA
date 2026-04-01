@@ -1,0 +1,268 @@
+@model PMS.Models.DfrDailyFitupViewModel
+@{
+    Layout = null; // standalone with header/footer partials
+    var antiForgery = Html.AntiForgeryToken();
+
+    // Sorted helper lists
+    var sortedLocationOptions = (Model.LocationOptions ?? new List<string>()).ToList();
+    var sortedJAddOptions = (Model.JAddOptions ?? new List<string>()).ToList();
+    // Preserve original DB order for Weld Type (expected to be by W_Type_ID asc)
+    var sortedWeldTypeOptions = Model.WeldTypeOptions ?? new List<string>();
+    // Preserve controller order (MATD_SN asc) - do not resort here
+    var sortedMaterialDescriptions = Model.MaterialDescriptions ?? new List<string>();
+    // Preserve controller order (Material_tbl.MAT_SN asc) - do NOT resort here
+    var sortedMaterialGrades = (Model.MaterialGrades ?? new List<string>()).ToList();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>PMS - DFR Editor</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" />
+    <link rel="stylesheet" href="~/css/DailyFitup.css" />
+    <link rel="stylesheet" href="~/css/DfrForm.css" />
+</head>
+<body>
+    @await Html.PartialAsync("~/Views/Shared/_DashboardHeader.cshtml")
+    <div class="dfr-form-wrap">
+        <h2>DFR Add / Edit</h2>
+        <form method="get" asp-action="DfrForm" asp-controller="Home" id="dfrHeaderForm">
+            <div class="grid-header">
+                <div class="field">
+                    <label for="projectIdSelect">Project No.</label>
+                    <select id="projectIdSelect" name="projectId" class="w350" asp-for="SelectedProjectId" asp-items="@(new SelectList(Model.Projects.Select(p => new { p.Id, Display = p.Id + " - " + p.Name }), "Id", "Display", Model.SelectedProjectId))"></select>
+                </div>
+                <div class="field">
+                    <label for="dfrLocationSelect">Location</label>
+                    <select name="location" id="dfrLocationSelect">
+                        @{
+                            foreach (var loc in sortedLocationOptions)
+                            {
+                                if (Model.SelectedLocation == loc)
+                                {
+                                    <option value="@loc" selected>@loc</option>
+                                }
+                                else
+                                {
+                                    <option value="@loc">@loc</option>
+                                }
+                            }
+
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="layoutInput">Layout</label>
+                    <input name="layout" value="@Model.SearchLayout" id="layoutInput" />
+                </div>
+                <div class="field">
+                    <label for="sheetInput">Sheet</label>
+                    <input name="sheet" value="@Model.SearchSheet" id="sheetInput" />
+                </div>
+                <div class="field">
+                    <label for="fitupDateHeader">Fit-up Date</label>
+                    <input id="fitupDateHeader" name="date" value="@Model.FitupDateHeader" />
+                </div>
+                <div class="field" style="align-self:flex-end;">
+                    <button type="submit">Load</button>
+                </div>
+            </div>
+        </form>
+        <div class="actions-bar">
+            <button type="button" id="btnAdd">Add Row</button>
+            <button type="button" id="btnSave">Save Changes</button>
+            <span id="dfrMsg" style="font-weight:600;"></span>
+        </div>
+        @if (Model.Rows.Count == 0)
+        {
+            <div>No rows loaded. Enter layout & sheet then Load.</div>
+        }
+        else
+        {
+            <div style="overflow:auto; max-height:65vh; border:1px solid #ccc;" id="dfrTableWrap">
+                <table class="dfr-table" id="dfrTable">
+                    <thead>
+                        <tr>
+                            <th id="colSn">S/N</th>
+                            <th id="colLocation">Location</th>
+                            <th id="colJointNo">Joint No.</th>
+                            <th id="colJAdd">J-Add</th>
+                            <th id="colWeldType">Weld Type</th>
+                            <th id="colRev">REV</th>
+                            <th id="colDiaIn">Dia In</th>
+                            <th id="colSch">Sch</th>
+                            <th id="colMatA">Mat A</th>
+                            <th id="colMatB">Mat B</th>
+                            <th id="colGradeA">Grade A</th>
+                            <th id="colGradeB">Grade B</th>
+                            <th id="colWps">WPS</th>
+                            <th id="colFitupReport">Fit-up Report</th>
+                            <th id="colFitupDate">Fit-up Date</th>
+                            <th id="colTacker">Tacker</th>
+                            <th id="colDeleted">Deleted</th>
+                            <th id="colCancelled">Cancelled</th>
+                            <th id="colConfirmed">Confirmed</th>
+                            <th id="colRemarks">Remarks</th>
+                            <th id="colUpdatedBy">Updated By</th>
+                            <th id="colUpdatedDate">Updated Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var sn = 0;
+                        }
+                        @foreach (var r in Model.Rows)
+                        {
+                            var locked = r.FitupConfirmed;
+                            <tr data-id="@r.JointId" class="@(locked ? "locked" : null)">
+                                <td>@(++sn)</td>
+                                <td>
+                                    @if (locked)
+                                    {
+                                        <select data-name="Location" name="Location" aria-labelledby="colLocation" disabled>
+                                            <option value="@r.Location">@r.Location</option>
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        if (sortedLocationOptions != null && sortedLocationOptions.Count > 0)
+                                        {
+                                            var has = !string.IsNullOrWhiteSpace(r.Location) && sortedLocationOptions.Any(x => string.Equals(x, r.Location, System.StringComparison.OrdinalIgnoreCase));
+                                            <select data-name="Location" name="Location" aria-labelledby="colLocation">
+                                                @if (!has && !string.IsNullOrWhiteSpace(r.Location))
+                                                {
+                                                    <option value="@r.Location" selected>@r.Location</option>
+                                                }
+                                                @foreach (var locOpt in sortedLocationOptions)
+                                                {
+                                                    if (string.Equals(locOpt, r.Location, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@locOpt" selected>@locOpt</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@locOpt">@locOpt</option>
+                                                    }
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+
+                                            <input data-name="Location" name="Location" aria-labelledby="colLocation" value="@r.Location" />
+                                        }
+                                    }
+                                </td>
+                                <td><input data-name="WeldNumber" name="WeldNumber" aria-labelledby="colJointNo" value="@r.WeldNumber" @(locked ? "disabled" : null) /></td>
+                                <td>
+                                    @{
+                                        var hasJ = !string.IsNullOrWhiteSpace(r.JAdd) && (sortedJAddOptions != null && sortedJAddOptions.Any(x => string.Equals(x, r.JAdd, System.StringComparison.OrdinalIgnoreCase)));
+                                    }
+                                    <select data-name="JAdd" name="JAdd" aria-labelledby="colJAdd" @(locked ? "disabled" : null)>
+                                        @if (!hasJ && !string.IsNullOrWhiteSpace(r.JAdd))
+                                        {
+                                            <option value="@r.JAdd" selected>@r.JAdd</option>
+                                        }
+                                        @foreach (var j in (sortedJAddOptions ?? new List<string>()))
+                                        {
+                                            if (string.Equals(j, r.JAdd, System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@j" selected>@j</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@j">@j</option>
+                                            }
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    @{
+                                        var wtOpts = sortedWeldTypeOptions ?? new List<string>();
+                                        var hasWt = !string.IsNullOrWhiteSpace(r.WeldType) && wtOpts.Any(x => string.Equals(x, r.WeldType, System.StringComparison.OrdinalIgnoreCase));
+                                    }
+                                    <select data-name="WeldType" name="WeldType" aria-labelledby="colWeldType" @(locked ? "disabled" : null)>
+                                        @if (!hasWt && !string.IsNullOrWhiteSpace(r.WeldType))
+                                        {
+                                            <option value="@r.WeldType" selected>@r.WeldType</option>
+                                        }
+                                        @foreach (var wt in wtOpts)
+                                        {
+                                            if (string.Equals(wt, r.WeldType, System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@wt" selected>@wt</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@wt">@wt</option>
+                                            }
+                                        }
+                                    </select>
+                                </td>
+                                <td><input data-name="Rev" name="Rev" aria-labelledby="colRev" value="@r.Rev" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="DiaIn" name="DiaIn" aria-labelledby="colDiaIn" value="@r.DiaIn" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="Sch" name="Sch" aria-labelledby="colSch" value="@r.Sch" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="MaterialA" name="MaterialA" aria-labelledby="colMatA" list="materialDescList" value="@r.MaterialA" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="MaterialB" name="MaterialB" aria-labelledby="colMatB" list="materialDescList" value="@r.MaterialB" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="GradeA" name="GradeA" aria-labelledby="colGradeA" list="materialGradeList" value="@r.GradeA" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="GradeB" name="GradeB" aria-labelledby="colGradeB" list="materialGradeList" value="@r.GradeB" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="Wps" name="Wps" aria-labelledby="colWps" value="@r.Wps" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="FitupReport" name="FitupReport" aria-labelledby="colFitupReport" value="@r.FitupReport" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="FitupDate" name="FitupDate" aria-labelledby="colFitupDate" value="@r.FitupDate" @(locked ? "disabled" : null) /></td>
+                                <td><input data-name="TackWelder" name="TackWelder" aria-labelledby="colTacker" value="@r.TackWelder" @(locked ? "disabled" : null) /></td>
+                                <td class="chk-cell"><input type="checkbox" data-name="Deleted" name="Deleted" aria-labelledby="colDeleted" @(r.Deleted ? "checked" : null) @(locked || string.IsNullOrWhiteSpace(r.FitupDate) ? "disabled" : null) title="@(string.IsNullOrWhiteSpace(r.FitupDate) ? "Requires Fit-up Date" : "")" /></td>
+                                <td class="chk-cell"><input type="checkbox" data-name="Cancelled" name="Cancelled" aria-labelledby="colCancelled" @(r.Cancelled ? "checked" : null) @(locked || !string.IsNullOrWhiteSpace(r.FitupDate) ? "disabled" : null) title="@(!string.IsNullOrWhiteSpace(r.FitupDate) ? "Not allowed when Fit-up Date exists" : "")" /></td>
+                                <td class="chk-cell"><input type="checkbox" data-name="FitupConfirmed" name="FitupConfirmed" aria-labelledby="colConfirmed" @(r.FitupConfirmed ? "checked" : null) /></td>
+                                <td><input data-name="Remarks" name="Remarks" aria-labelledby="colRemarks" value="@r.Remarks" @(locked ? "disabled" : null) /></td>
+                                <td>@r.UpdatedBy</td>
+                                <td>@r.UpdatedDate</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+    @await Html.PartialAsync("~/Views/Shared/_DashboardFooter.cshtml")
+    <!-- Searchable lists for Material and Grade -->
+    <datalist id="materialDescList">
+        @if (sortedMaterialDescriptions != null)
+        {
+            foreach (var d in sortedMaterialDescriptions)
+            {
+                if (!string.IsNullOrWhiteSpace(d))
+                {
+                    <option value="@d"></option>
+                }
+            }
+        }
+    </datalist>
+    <datalist id="materialGradeList">
+        @if (sortedMaterialGrades != null)
+        {
+            foreach (var g in sortedMaterialGrades)
+            {
+                if (!string.IsNullOrWhiteSpace(g))
+                {
+                    <option value="@g"></option>
+                }
+            }
+        }
+    </datalist>
+    <div style="display:none">@antiForgery</div>
+    <script>
+        window.__dfrFormConfig = {
+            bulkUpdateUrl: '@Url.Action("BulkUpdateDfrRows", "Home")',
+            addRowUrl: '@Url.Action("AddDfrRow", "Home")',
+            locationOptions: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sortedLocationOptions ?? new List<string>())),
+            jAddOptions: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sortedJAddOptions ?? new List<string>())),
+            weldTypeOptions: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sortedWeldTypeOptions ?? new List<string>())),
+            materialDescriptions: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sortedMaterialDescriptions ?? new List<string>())),
+            materialGrades: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sortedMaterialGrades ?? new List<string>())),
+            fitupDateHeader: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.FitupDateHeader ?? string.Empty))
+        };
+    </script>
+    <script src="~/js/dfr-form.js" asp-append-version="true"></script>
+</body>
+</html>

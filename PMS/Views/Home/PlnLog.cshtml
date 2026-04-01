@@ -1,0 +1,467 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model IEnumerable<PMS.Models.Pln>
+@{
+    Layout = null;
+    ViewData["Title"] = "Productivity Plan";
+    var projectMap = (ViewBag.ProjectMap as Dictionary<int, string>) ?? new Dictionary<int, string>();
+    var defaultProjectId = ViewBag.DefaultProjectId as int?;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - PMS</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png">
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" asp-append-version="true">
+    <style>
+        .page { width:90%; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1); padding:20px; }
+        .page-title { color:#176d8a; margin:0 0 16px 0; padding-bottom:10px; border-bottom:2px solid #e6f6fa; font-size:2em; }
+        label { font-weight:600; color:#176d8a; font-size:.9rem; }
+        .form-control { padding:8px 12px; border:1px solid #cce7ef; border-radius:4px; background:#fff; color:#176d8a; font-size:.9rem; width:100%; box-sizing:border-box; }
+        .user-table th, .user-table td { font-size:.9rem; }
+        .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+        .form-group { display:flex; flex-direction:column; gap:6px; }
+        .form-control:focus { outline:none; border-color:#1f99be; box-shadow:0 0 0 2px rgba(31,153,190,.2); }
+        .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+        .btn { padding:8px 14px; border:none; border-radius:4px; cursor:pointer; font-weight:600; transition:.2s; }
+        .btn-primary { background:#1f99be; color:#fff; } .btn-primary:hover{ background:#176d8a; }
+        .btn-danger { background:#cc0000; color:#fff; } .btn-danger:hover{ background:#a30000; }
+        .btn-secondary { background:#7a9aa8; color:#fff; }
+        .btn-outline { background:#fff; color:#176d8a; border:1px solid #1f99be; }
+        .btn-outline:hover { background:#1f99be; color:#fff; }
+        .btn-success { background:#27ae60; color:#fff; } .btn-success:hover { background:#1e8c4c; }
+        .user-table { width:100%; border-collapse:collapse; margin-top:10px; }
+        .user-table th { background-color:#e6f6fa; color:#176d8a; padding:10px 12px; text-align:left; position:sticky; top:0; }
+        .user-table td { padding:10px 12px; border-bottom:1px solid #e6f6fa; color:#1a6d86; }
+        .msg { margin:0 0 12px 0; font-weight:400; font-size:0.875rem; display:block; border:none; outline:none; box-shadow:none; background:transparent; }
+        .msg.text-danger { color:#cc0000; }
+        .msg-success { margin:0 0 12px 0; color:#27ae60; font-weight:400; font-size:0.875rem; display:block; border:none; outline:none; box-shadow:none; background:transparent; }
+        .row-actions { display:flex; gap:8px; }
+        .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:25px; }
+        .filter-bar input[type="text"] { flex:1 1 260px; }
+        .count { font-size:.8rem; color:#176d8a; }
+        .filter-actions { display:flex; gap:8px; align-items:center; }
+        .col-serial { width:30px; min-width:30px; font-weight:600; text-align:center; }
+        .col-actions, td.row-actions { width:90px; max-width:90px; }
+
+        /* Import section */
+        .import-section { margin-top:20px; padding:16px; border:1px dashed #cce7ef; border-radius:8px; background:#f9fdfe; }
+        .import-section label { display:block; margin-bottom:8px; }
+        .import-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+        /* Modal */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center; }
+        .modal-content { background:#fff; padding:25px; border-radius:8px; width:90%; max-width:520px; max-height:80vh; overflow-y:auto; box-shadow:0 4px 20px rgba(0,0,0,0.15); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid #e6f6fa; }
+        .modal-title { color:#176d8a; font-size:1.3rem; margin:0; }
+        .close-modal { background:none; border:none; font-size:1.5rem; cursor:pointer; color:#176d8a; }
+        .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; padding-top:12px; border-top:1px solid #e6f6fa; }
+
+        /* Project filter header (Drawings style) */
+        .fitup-header { display:flex; gap:12px; flex-wrap:wrap; align-items:center; padding:10px 0; }
+        .fitup-header label { margin-right:4px; }
+        .header-fixed { width:auto; display:inline-block; }
+        .w350 { width:350px; min-width:350px; }
+
+        /* Searchable select (Drawings style) */
+        .ss-wrap { position:relative; display:inline-block; vertical-align:middle; }
+        .ss-wrap.w350 { width:350px; min-width:350px; }
+        .ss-input { width:100%; box-sizing:border-box; cursor:pointer; padding:8px 12px; border:1px solid #cce7ef; border-radius:4px; color:#176d8a; font-size:.9rem; background:#fff; }
+        .ss-input:focus { cursor:text; border-color:#1f99be; outline:none; }
+        .ss-list { display:none; position:absolute; left:0; right:0; top:100%; z-index:1200; background:#fff; border:1px solid #1f99be; border-top:none; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,.12); }
+        .ss-item { padding:6px 10px; cursor:pointer; font-size:.9rem; color:#176d8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ss-item:hover, .ss-item.ss-highlight { background:#e6f6fa; }
+        .ss-item.ss-active { font-weight:700; }
+        .ss-empty { padding:6px 10px; font-size:.85rem; color:#999; font-style:italic; }
+        .ss-open .ss-input { border-radius:4px 4px 0 0; border-color:#1f99be; }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_DashboardHeader")
+
+    <div class="page">
+        <h1 class="page-title">Productivity Plan</h1>
+
+        @if (TempData["Msg"] is string m && !string.IsNullOrWhiteSpace(m))
+        {
+            var isSuccessMsg = System.Text.RegularExpressions.Regex.IsMatch(m, "(successfully|saved|uploaded|updated|added|complete|deleted)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var flashClass = isSuccessMsg ? "msg msg-success" : "msg text-danger";
+            <div id="topFlashMsg" class="@flashClass" role="status" aria-live="polite">@m</div>
+        }
+
+        <!-- Project filter (Drawings style) -->
+        <div class="fitup-header">
+            <form method="get" asp-action="PlnLog" asp-controller="Home" id="plnFilterForm">
+                <label for="projectSelect">Project</label>
+                <select id="projectSelect" name="projectId" class="form-control header-fixed w350 searchable-select">
+                    @foreach (var p in (IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.FilterProjects)
+                    {
+                        <option value="@p.Value" selected="@p.Selected">@p.Text</option>
+                    }
+                </select>
+            </form>
+        </div>
+
+        <form asp-action="SavePln" asp-controller="Home" method="post" id="plnForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="PLN_ID" name="PLN_ID" value="0" />
+            <input type="hidden" id="PLN_Project_No" name="PLN_Project_No" value="@(defaultProjectId)" />
+            <div class="grid">
+                <div class="form-group">
+                    <label for="PLN_LOCATION">Location</label>
+                    <select class="form-control" id="PLN_LOCATION" name="PLN_LOCATION" required>
+                        <option value="">-- Select --</option>
+                        <option value="WS">WS</option>
+                        <option value="FW">FW</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="PLN_DATE">Date</label>
+                    <input class="form-control" id="PLN_DATE" name="PLN_DATE" type="date" />
+                </div>
+                <div class="form-group">
+                    <label for="PLN_DIA">Dia</label>
+                    <input class="form-control" id="PLN_DIA" name="PLN_DIA" type="number" step="0.01" />
+                </div>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" onclick="clearPlnForm()">Clear</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+
+        <!-- Import / Append by Excel -->
+        <div class="import-section">
+            <label>Import / Append from Excel</label>
+            <form asp-action="ImportPln" asp-controller="Home" method="post" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="import-row">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" class="form-control" style="flex:1 1 300px;" required />
+                    <button type="submit" class="btn btn-success">Upload &amp; Import</button>
+                    <a asp-action="DownloadPlnTemplate" asp-controller="Home" class="btn btn-outline" style="margin-left:4px;">Download Template</a>
+                </div>
+                <small style="color:#7a9aa8; margin-top:6px; display:block;">
+                    Expected columns: Project No, Location, Date, Dia.
+                    Rows with an existing ID will be updated; new rows will be appended.
+                </small>
+            </form>
+        </div>
+
+        <div class="filter-bar">
+            <input id="searchBox" class="form-control" type="text" placeholder="Search all columns..." autocomplete="off" />
+            <div class="filter-actions">
+                <button id="downloadBtn" type="button" class="btn btn-outline">Download Excel</button>
+                <span id="rowCount" class="count"></span>
+            </div>
+        </div>
+
+        <table class="user-table" id="plnTable">
+            <thead>
+                <tr>
+                    <th class="col-serial">S/N</th>
+                    <th>ID</th>
+                    <th>Project No</th>
+                    <th>Location</th>
+                    <th>Date</th>
+                    <th>Dia</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var p in Model)
+            {
+                var projLabel = projectMap.TryGetValue(p.PLN_Project_No, out var lbl) ? lbl : p.PLN_Project_No.ToString();
+                <tr data-id="@p.PLN_ID" data-project-id="@p.PLN_Project_No">
+                    <td class="col-serial"></td>
+                    <td>@p.PLN_ID</td>
+                    <td>@projLabel</td>
+                    <td>@p.PLN_LOCATION</td>
+                    <td>@(p.PLN_DATE.HasValue ? p.PLN_DATE.Value.ToString("yyyy-MM-dd") : "")</td>
+                    <td>@p.PLN_DIA</td>
+                    <td class="row-actions">
+                        <button type="button" class="btn btn-primary" onclick="editPln(this)">Edit</button>
+                        <button type="button" class="btn btn-danger delete-pln" data-id="@p.PLN_ID">Del</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @await Html.PartialAsync("_DashboardFooter")
+
+    <form id="deletePlnForm" method="post" asp-action="DeletePln" asp-controller="Home" style="display:none;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="deletePlnId" />
+    </form>
+
+    <div class="modal" id="confirmDeletePlnModal" role="dialog" aria-modal="true" aria-labelledby="plnDeleteTitle" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="plnDeleteTitle">Confirm Delete</h2>
+                <button class="close-modal" type="button" aria-label="Close" onclick="closePlnDeleteModal()">&times;</button>
+            </div>
+            <p id="confirmDeletePlnMessage" style="color:#176d8a; margin:0 0 16px 0;"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closePlnDeleteModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmPlnDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            try {
+                var msg = document.getElementById('topFlashMsg');
+                if (!msg) return;
+                msg.tabIndex = -1;
+                msg.focus();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (e) { /* ignore */ }
+        });
+
+        function byId(id) { return document.getElementById(id); }
+
+        /* ── Searchable select widget (same as Drawings) ── */
+        (function () {
+            function makeSearchableSelect(sel) {
+                if (!sel || sel.dataset.searchable) return;
+                sel.dataset.searchable = '1';
+                sel.style.display = 'none';
+                var wrap = document.createElement('div');
+                wrap.className = 'ss-wrap';
+                if (sel.classList.contains('w350')) wrap.classList.add('w350');
+                sel.parentNode.insertBefore(wrap, sel);
+                wrap.appendChild(sel);
+
+                var input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'ss-input form-control';
+                input.setAttribute('autocomplete', 'off');
+                input.setAttribute('spellcheck', 'false');
+                wrap.appendChild(input);
+
+                var list = document.createElement('div');
+                list.className = 'ss-list';
+                wrap.appendChild(list);
+
+                var items = [];
+                var highlighted = -1;
+                var open = false;
+
+                function buildItems() {
+                    items = [];
+                    Array.from(sel.options).forEach(function (opt) {
+                        items.push({ value: opt.value, text: opt.text || opt.value });
+                    });
+                }
+
+                function syncInputText() {
+                    var idx = sel.selectedIndex;
+                    input.value = idx >= 0 && sel.options[idx] ? (sel.options[idx].text || sel.options[idx].value) : '';
+                }
+
+                function render(filter) {
+                    list.innerHTML = '';
+                    highlighted = -1;
+                    var lc = (filter || '').toLowerCase();
+                    var count = 0;
+                    items.forEach(function (item, i) {
+                        if (lc && !(item.text || '').toLowerCase().includes(lc)) return;
+                        var div = document.createElement('div');
+                        div.className = 'ss-item';
+                        div.textContent = item.text;
+                        div.dataset.idx = String(i);
+                        if (item.value === sel.value) div.classList.add('ss-active');
+                        div.addEventListener('mousedown', function (e) {
+                            e.preventDefault();
+                            pick(i);
+                        });
+                        list.appendChild(div);
+                        count++;
+                    });
+                    if (count === 0) {
+                        var empty = document.createElement('div');
+                        empty.className = 'ss-empty';
+                        empty.textContent = 'No match';
+                        list.appendChild(empty);
+                    }
+                }
+
+                function pick(idx) {
+                    if (idx < 0 || idx >= items.length) return;
+                    sel.value = items[idx].value;
+                    syncInputText();
+                    closeList();
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                function showList() {
+                    if (open) return;
+                    open = true;
+                    render(input.value !== (items[sel.selectedIndex] ? items[sel.selectedIndex].text : '') ? input.value : '');
+                    list.style.display = 'block';
+                    wrap.classList.add('ss-open');
+                }
+
+                function closeList() {
+                    open = false;
+                    list.style.display = 'none';
+                    wrap.classList.remove('ss-open');
+                    syncInputText();
+                }
+
+                input.addEventListener('focus', function () { input.select(); showList(); });
+                input.addEventListener('input', function () { render(input.value); showList(); });
+                input.addEventListener('blur', function () { setTimeout(closeList, 180); });
+                input.addEventListener('keydown', function (e) {
+                    var visible = list.querySelectorAll('.ss-item');
+                    if (e.key === 'ArrowDown') { e.preventDefault(); highlighted = Math.min(highlighted + 1, visible.length - 1); highlightItem(visible); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); highlighted = Math.max(highlighted - 1, 0); highlightItem(visible); }
+                    else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (highlighted >= 0 && highlighted < visible.length) {
+                            var idx = parseInt(visible[highlighted].dataset.idx);
+                            pick(idx);
+                        }
+                    }
+                    else if (e.key === 'Escape') { closeList(); }
+                });
+
+                function highlightItem(visible) {
+                    visible.forEach(function (el, i) {
+                        el.classList.toggle('ss-highlight', i === highlighted);
+                        if (i === highlighted) el.scrollIntoView({ block: 'nearest' });
+                    });
+                }
+
+                buildItems();
+                syncInputText();
+            }
+
+            document.querySelectorAll('select.searchable-select').forEach(makeSearchableSelect);
+        })();
+
+        /* ── Project filter: auto-submit on change ── */
+        var projectSelect = byId('projectSelect');
+        if (projectSelect) {
+            projectSelect.addEventListener('change', function () {
+                syncProjectFromFilter();
+                byId('plnFilterForm').submit();
+            });
+        }
+
+        function syncProjectFromFilter() {
+            var filter = byId('projectSelect');
+            if (filter) byId('PLN_Project_No').value = filter.value;
+        }
+
+        function clearPlnForm() {
+            byId('PLN_ID').value = '0';
+            byId('PLN_LOCATION').value = '';
+            byId('PLN_DATE').value = '';
+            byId('PLN_DIA').value = '';
+            syncProjectFromFilter();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            byId('PLN_LOCATION')?.focus();
+        }
+
+        function editPln(btn) {
+            var tr = btn.closest('tr');
+            if (!tr) return;
+            var tds = tr.children;
+            // 0:SN, 1:ID, 2:Project No (display), 3:Location, 4:Date, 5:Dia, 6:Actions
+            byId('PLN_ID').value = tr.dataset.id || '0';
+            byId('PLN_Project_No').value = tr.dataset.projectId || '';
+            byId('PLN_LOCATION').value = (tds[3]?.textContent || '').trim();
+            byId('PLN_DATE').value = (tds[4]?.textContent || '').trim();
+            byId('PLN_DIA').value = (tds[5]?.textContent || '').trim();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(function () { byId('PLN_LOCATION')?.focus(); }, 250);
+        }
+
+        function renumber() {
+            var i = 1;
+            document.querySelectorAll('#plnTable tbody tr').forEach(function (tr) {
+                if (tr.style.display === 'none') return;
+                var c = tr.querySelector('.col-serial');
+                if (c) c.textContent = i++;
+            });
+        }
+
+        /* ── Client-side search across all visible columns (Drawings style) ── */
+        var searchInput = byId('searchBox');
+        var table = byId('plnTable');
+        var rowCountEl = byId('rowCount');
+
+        function applyFilter() {
+            var q = (searchInput.value || '').trim().toLowerCase();
+            var shown = 0, total = 0;
+            table.querySelectorAll('tbody tr').forEach(function (tr) {
+                total++;
+                var cells = tr.children;
+                var match = false;
+                if (!q) { match = true; }
+                else {
+                    // Search columns 1..5 (ID, Project No, Location, Date, Dia)
+                    for (var c = 1; c <= 5; c++) {
+                        if ((cells[c]?.textContent || '').toLowerCase().includes(q)) { match = true; break; }
+                    }
+                }
+                tr.style.display = match ? '' : 'none';
+                if (match) shown++;
+            });
+            rowCountEl.textContent = shown + '/' + total;
+            renumber();
+        }
+
+        searchInput?.addEventListener('input', applyFilter);
+        applyFilter();
+
+        byId('downloadBtn')?.addEventListener('click', function () {
+            var q = encodeURIComponent(searchInput.value.trim());
+            var pid = projectSelect ? projectSelect.value : '';
+            var url = '/Home/ExportPln?projectId=' + encodeURIComponent(pid);
+            if (q) url += '&q=' + q;
+            window.location = url;
+        });
+
+        // Delete confirm via modal
+        var pendingPln = null;
+        function closePlnDeleteModal() {
+            var modal = document.getElementById('confirmDeletePlnModal');
+            if (modal) { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); }
+            pendingPln = null;
+        }
+        function confirmPlnDelete() {
+            var form = document.getElementById('deletePlnForm');
+            var idInput = document.getElementById('deletePlnId');
+            if (!pendingPln || !form || !idInput) return;
+            idInput.value = pendingPln.id;
+            closePlnDeleteModal();
+            form.submit();
+        }
+        function openPlnDeleteModal(id) {
+            pendingPln = { id: id };
+            var msgEl = document.getElementById('confirmDeletePlnMessage');
+            if (msgEl) msgEl.textContent = 'Are you sure you want to delete record #' + id + '?';
+            var modal = document.getElementById('confirmDeletePlnModal');
+            if (modal) { modal.style.display = 'flex'; modal.setAttribute('aria-hidden', 'false'); }
+        }
+        document.addEventListener('click', function (ev) {
+            var btn = ev.target?.closest('.delete-pln');
+            if (!btn) return;
+            ev.preventDefault();
+            var id = btn.getAttribute('data-id');
+            if (!id) return;
+            openPlnDeleteModal(id);
+        });
+        window.addEventListener('click', function (event) {
+            var modal = document.getElementById('confirmDeletePlnModal');
+            if (event.target === modal) closePlnDeleteModal();
+        });
+
+        renumber();
+    </script>
+</body>
+</html>

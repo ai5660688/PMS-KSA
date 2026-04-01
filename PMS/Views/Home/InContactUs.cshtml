@@ -1,0 +1,77 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PMS - Contact Us</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png">
+    <link rel="stylesheet" href="~/css/InContactUsStyle.css">
+</head>
+<body>
+    <h1>
+        <img src="~/img/PMS_logo.png" alt="Logo" class="main-logo">
+    </h1>
+
+    <div class="container-wrapper">
+        <div class="contact-container">
+            <h2>Contact Us</h2>
+            @{
+                var flash = TempData["FlashMessage"] as string;
+            }
+            @if (!string.IsNullOrEmpty(flash))
+            {
+                <div class="alert-success">@flash</div>
+            }
+            <form method="post" action="@Url.Action("InContactUs","Home")">
+                @Html.AntiForgeryToken()
+                @Html.ValidationSummary(true, "", new { @class = "validation-summary-errors" })
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="Name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="Email" required>
+                </div>
+
+                <!-- Subject and Message mapped from editor inputs -->
+                <input type="hidden" id="SubjectHidden" name="Subject" />
+                <input type="hidden" id="MessageHidden" name="Message" />
+
+                <div class="button-container">
+                    <button type="submit">Send Message</button>
+                </div>
+            </form>
+
+            <div class="back-to-login-container">
+                <a href="@Url.Action("Login", "Home")" class="back-to-login-link">Back to Login</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="footer-center">
+            This system is strictly restricted to authorized users only.<br>
+            © 2025 Piping Management System. All rights reserved.
+        </div>
+        <div class="footer-right">
+            <img src="~/img/work-smarter-not-harder.jpg?v=3" alt="Logo" class="footer-logo" />
+        </div>
+    </div>
+    <script src="@Url.Content("~/js/site.js")"></script>
+    <script>
+        (function () {
+            const form = document.querySelector('form[action$="InContactUs"]');
+            if (!form) return;
+            form.addEventListener('submit', function () {
+                const title = document.getElementById('title');
+                const contentsDiv = document.getElementById('contents');
+                const subjectHidden = document.getElementById('SubjectHidden');
+                const messageHidden = document.getElementById('MessageHidden');
+                if (subjectHidden) subjectHidden.value = title?.value ?? '';
+                if (messageHidden) messageHidden.value = contentsDiv?.innerHTML ?? '';
+            });
+        })();
+    </script>
+</body>
+</html>

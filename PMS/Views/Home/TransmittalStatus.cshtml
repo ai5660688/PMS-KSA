@@ -1,0 +1,498 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = "_LayoutDashboard";
+    ViewData["Title"] = "Transmittal Status";
+    var statusData = (ViewBag.StatusData as List<PMS.Models.TransmittalStatusGroup>) ?? new List<PMS.Models.TransmittalStatusGroup>();
+    var statusDate = (ViewBag.StatusDate as string) ?? "";
+    var defaultProjectId = ViewBag.DefaultProjectId as int?;
+}
+
+@section Head {
+    <style>
+        .tr-status-container { padding: 12px 12px 32px; background: #fff8eb; min-height: calc(100vh - 120px); }
+        .tr-status-card { background: #fff8eb; border: 1px solid #e6f6fa; border-radius: 10px; box-shadow: 0 4px 12px rgba(31,153,190,0.12); padding: 14px 16px; }
+        .tr-status-header { font-size: 1.3em; font-weight: 700; color: #176d8a; margin-bottom: 12px; }
+        .tr-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; align-items: flex-end; }
+        .tr-filter { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+        .tr-filter label { color: #176d8a; font-weight: 600; font-size: .9rem; }
+        .tr-input { padding: 8px 10px; border: 1px solid #cce7ef; border-radius: 6px; color: #176d8a; background: #fff; min-width: 320px; font-size: .9rem; }
+        .tr-input:focus { border-color: #176d8a; outline: none; }
+        .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid transparent; font-weight: 700; cursor: pointer; line-height: 1.2; font-size: .9rem; }
+        .btn-primary { background: #1f99be; color: #fff; border-color: #1f99be; }
+        .btn-primary:hover { background: #176d8a; border-color: #176d8a; }
+        .btn-outline { background: #fff; color: #176d8a; border: 1px solid #1f99be; text-decoration: none; }
+        .btn-outline:hover { background: #1f99be; color: #fff; }
+        .tr-date { color: #176d8a; font-weight: 700; font-size: .95rem; margin-bottom: 10px; text-align: right; }
+        .tr-empty { color: #176d8a; font-size: .95rem; padding: 20px 0; }
+
+        /* Category group */
+        .tr-group { margin-bottom: 18px; background: #fff; border: 1px solid #e6f6fa; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(31,153,190,0.06); }
+        .tr-group-title { font-size: 1.1em; font-weight: 700; color: #fff; background: #00bfff; text-align: center; padding: 8px 12px; margin: 0; }
+
+        /* Status table */
+        .tr-table-wrap { overflow: auto; max-height: 50vh; scrollbar-color: #1f99be #f0fbff; scrollbar-width: thin; }
+        .tr-table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+        .tr-table-wrap::-webkit-scrollbar-track { background: #f0fbff; border-radius: 8px; }
+        .tr-table-wrap::-webkit-scrollbar-thumb { background: #1f99be; border-radius: 8px; }
+        .tr-table { width: 100%; border-collapse: collapse; background: #fff; }
+        .tr-table th, .tr-table td { border: 1px solid #cce7ef; padding: 8px 12px; color: #176d8a; font-size: .88rem; }
+        .tr-table th { position: sticky; top: 0; z-index: 1; font-weight: 700; background: #e6f6fa; text-align: center; }
+        .tr-table td { text-align: left; }
+        .tr-table td.val-col { text-align: center; font-weight: 700; min-width: 70px; }
+        .tr-table tr:hover td { background: #f8fcff; }
+        .tr-table .row-indent td:first-child { padding-left: 28px; }
+        .tr-table .row-indent td:first-child::before { content: "– "; color: #1f99be; }
+        .tr-table .row-total td { font-weight: 700; background: #e6f6fa; border-top: 2px solid #176d8a; }
+        .tr-table .row-pending td.val-col { color: #e67e22; }
+        .tr-table .row-rejected td.val-col { color: #cc0000; }
+        .tr-table .row-received td.val-col { color: #27ae60; }
+
+        /* Charts */
+        .tr-charts-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 14px 14px; }
+        .tr-chart-card { flex: 1 1 300px; background: #f8fcff; border: 1px solid #e6f6fa; border-radius: 8px; padding: 12px; min-width: 0; }
+        .tr-chart-card canvas { max-height: 260px; }
+        .tr-chart-title { font-weight: 700; color: #176d8a; margin-bottom: 8px; font-size: .95rem; text-align: center; }
+
+        /* Overall summary section */
+        .tr-summary { margin-bottom: 20px; background: #fff; border: 1px solid #e6f6fa; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(31,153,190,0.10); }
+        .tr-summary-title { font-size: 1.15em; font-weight: 700; color: #fff; background: linear-gradient(135deg, #1f99be, #176d8a); text-align: center; padding: 10px 14px; margin: 0; letter-spacing: .3px; }
+        .tr-summary-charts { display: flex; gap: 16px; flex-wrap: wrap; padding: 16px; }
+        .tr-summary-charts .tr-chart-card { flex: 1 1 340px; min-height: 220px; }
+        .tr-summary-charts .tr-chart-card canvas { max-height: 300px; }
+
+        /* Searchable select */
+        .ss-wrap { position: relative; display: inline-block; vertical-align: middle; }
+        .ss-wrap.w350 { width: 350px; min-width: 350px; }
+        .ss-input { width: 100%; box-sizing: border-box; cursor: pointer; padding: 8px 12px; border: 1px solid #cce7ef; border-radius: 6px; color: #176d8a; font-size: .9rem; background: #fff; }
+        .ss-input:focus { cursor: text; border-color: #1f99be; outline: none; }
+        .ss-list { display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 1200; background: #fff; border: 1px solid #1f99be; border-top: none; border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,.12); }
+        .ss-item { padding: 6px 10px; cursor: pointer; font-size: .9rem; color: #176d8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ss-item:hover, .ss-item.ss-highlight { background: #e6f6fa; }
+        .ss-item.ss-active { font-weight: 700; }
+        .ss-empty { padding: 6px 10px; font-size: .85rem; color: #999; font-style: italic; }
+        .ss-open .ss-input { border-radius: 6px 6px 0 0; border-color: #1f99be; }
+
+        @@media (max-width: 1200px) { .tr-charts-row { flex-direction: column; } }
+        @@media (max-width: 640px) { .tr-status-container { padding: 12px; } .tr-input { min-width: 100%; } }
+    </style>
+}
+
+<div class="tr-status-container">
+    <div class="tr-status-card">
+        <div class="tr-status-header">
+            <span>Transmittal Status</span>
+        </div>
+
+        <form method="get" asp-action="TransmittalStatus" asp-controller="Home" class="tr-filters" id="trStatusFilterForm">
+            <div class="tr-filter">
+                <label for="projectSelect">Project</label>
+                <select id="projectSelect" name="projectId" class="tr-input searchable-select w350">
+                    @foreach (var p in (IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.FilterProjects)
+                    {
+                        <option value="@p.Value" selected="@p.Selected">@p.Text</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Load</button>
+            @if (statusData.Count > 0)
+            {
+                <button type="button" class="btn btn-outline" id="downloadStatusExcelBtn">Download Excel</button>
+            }
+        </form>
+
+        @if (statusData.Count == 0)
+        {
+            <div class="tr-empty">Select a project and click Load to view Transmittal status.</div>
+        }
+        else
+        {
+            <div class="tr-date">Date: @statusDate</div>
+
+            <!-- ===== Overall Summary Section ===== -->
+            <div class="tr-summary">
+                <h3 class="tr-summary-title">Overall Summary — All Categories</h3>
+                <div class="tr-summary-charts">
+                    <div class="tr-chart-card">
+                        <div class="tr-chart-title">Pending vs Received by Category</div>
+                        <canvas id="overviewBarChart" height="180"></canvas>
+                    </div>
+                    <div class="tr-chart-card">
+                        <div class="tr-chart-title">Overall Response Breakdown</div>
+                        <canvas id="overviewDoughnutChart" height="180"></canvas>
+                    </div>
+                    <div class="tr-chart-card">
+                        <div class="tr-chart-title">Submission Totals by Category</div>
+                        <canvas id="overviewPieChart" height="180"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            var chartIdx = 0;
+            foreach (var grp in statusData)
+            {
+                <div class="tr-group">
+                    <h3 class="tr-group-title">@grp.Category</h3>
+                    <div class="tr-table-wrap">
+                        <table class="tr-table">
+                            <thead>
+                                <tr>
+                                    <th>Submitted / Responded</th>
+                                    <th>Status</th>
+                                    <th>Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in grp.Rows)
+                                {
+                                    var rowClass = row.IsIndented ? "row-indent" : "";
+                                    if (row.Label == "Pending") rowClass += " row-pending";
+                                    else if (row.Label == "Received") rowClass += " row-received";
+                                    else if (row.Label == "Rejected") rowClass += " row-rejected";
+                                    <tr class="@rowClass">
+                                        <td>@row.Label</td>
+                                        <td class="val-col">@row.Value</td>
+                                        <td>@(row.Remarks ?? "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Charts for this group -->
+                    <div class="tr-charts-row">
+                        <div class="tr-chart-card">
+                            <div class="tr-chart-title">@grp.Category — Status Breakdown</div>
+                            <canvas id="trBarChart_@chartIdx" height="140"></canvas>
+                        </div>
+                        <div class="tr-chart-card">
+                            <div class="tr-chart-title">@grp.Category — Response Distribution</div>
+                            <canvas id="trDoughnutChart_@chartIdx" height="140"></canvas>
+                        </div>
+                    </div>
+                </div>
+                chartIdx++;
+            }
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chart.js/chart.umd.min.js"></script>
+    <script id="trStatusChartData" type="application/json">
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(statusData.Select((g, i) => new {
+            idx = i,
+            category = g.Category,
+            labels = g.Rows.Select(r => r.Label).ToArray(),
+            values = g.Rows.Select(r => r.Value).ToArray()
+        }).ToArray()))
+    </script>
+    <script>
+    (function () {
+        var groups = JSON.parse(document.getElementById('trStatusChartData').textContent);
+        if (!groups || groups.length === 0) return;
+
+        /* ---- Shared colour palette ---- */
+        var barColors = [
+            'rgba(31,153,190,0.85)',   // Total Submitted
+            'rgba(230,126,34,0.85)',   // Pending
+            'rgba(39,174,96,0.85)',    // Received
+            'rgba(46,204,113,0.80)',   // Approved
+            'rgba(241,196,15,0.85)',   // Approved with Comments
+            'rgba(192,57,43,0.85)'     // Rejected
+        ];
+        var barBorders = [
+            'rgba(31,153,190,1)',
+            'rgba(230,126,34,1)',
+            'rgba(39,174,96,1)',
+            'rgba(46,204,113,1)',
+            'rgba(241,196,15,1)',
+            'rgba(192,57,43,1)'
+        ];
+        var doughnutColors = [
+            'rgba(230,126,34,0.85)',   // Pending
+            'rgba(46,204,113,0.85)',   // Approved
+            'rgba(241,196,15,0.85)',   // Approved with Comments
+            'rgba(192,57,43,0.85)'     // Rejected
+        ];
+        var doughnutBorders = [
+            'rgba(230,126,34,1)',
+            'rgba(46,204,113,1)',
+            'rgba(241,196,15,1)',
+            'rgba(192,57,43,1)'
+        ];
+
+        /* ===== Overall Summary Charts ===== */
+
+        // 1. Grouped bar: Pending vs Received by Category
+        var overviewBarCtx = document.getElementById('overviewBarChart');
+        if (overviewBarCtx) {
+            var catLabels = groups.map(function (g) { return g.category; });
+            // Index 1 = Pending, 2 = Received
+            var pendingData = groups.map(function (g) { return g.values[1] || 0; });
+            var receivedData = groups.map(function (g) { return g.values[2] || 0; });
+            new Chart(overviewBarCtx, {
+                type: 'bar',
+                data: {
+                    labels: catLabels,
+                    datasets: [
+                        {
+                            label: 'Pending',
+                            data: pendingData,
+                            backgroundColor: 'rgba(230,126,34,0.8)',
+                            borderColor: 'rgba(230,126,34,1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Received',
+                            data: receivedData,
+                            backgroundColor: 'rgba(39,174,96,0.8)',
+                            borderColor: 'rgba(39,174,96,1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 11, weight: 'bold' }, color: '#176d8a' } }
+                    },
+                    scales: {
+                        x: { ticks: { font: { size: 10 }, color: '#176d8a' }, grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#176d8a', stepSize: 1 }, grid: { color: 'rgba(31,153,190,0.08)' } }
+                    }
+                }
+            });
+        }
+
+        // 2. Doughnut: Overall Response Breakdown (sum across all categories)
+        var overviewDoughnutCtx = document.getElementById('overviewDoughnutChart');
+        if (overviewDoughnutCtx) {
+            var totalPending = 0, totalApproved = 0, totalApprovedWC = 0, totalRejected = 0;
+            groups.forEach(function (g) {
+                totalPending += g.values[1] || 0;      // Pending
+                totalApproved += g.values[3] || 0;     // Approved
+                totalApprovedWC += g.values[4] || 0;   // Approved with Comments
+                totalRejected += g.values[5] || 0;     // Rejected
+            });
+            new Chart(overviewDoughnutCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Approved', 'Approved w/ Comments', 'Rejected'],
+                    datasets: [{
+                        data: [totalPending, totalApproved, totalApprovedWC, totalRejected],
+                        backgroundColor: doughnutColors,
+                        borderColor: doughnutBorders,
+                        borderWidth: 2,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '50%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#176d8a', padding: 12, usePointStyle: true, pointStyleWidth: 10 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+                                    var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                    return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. Pie: Submission Totals by Category
+        var overviewPieCtx = document.getElementById('overviewPieChart');
+        if (overviewPieCtx) {
+            var pieColors = [
+                'rgba(31,153,190,0.80)', 'rgba(0,191,255,0.80)', 'rgba(23,109,138,0.80)',
+                'rgba(39,174,96,0.80)', 'rgba(230,126,34,0.80)', 'rgba(155,89,182,0.80)',
+                'rgba(241,196,15,0.80)', 'rgba(192,57,43,0.80)', 'rgba(52,73,94,0.80)'
+            ];
+            var pieBorders = pieColors.map(function (c) { return c.replace('0.80', '1'); });
+            new Chart(overviewPieCtx, {
+                type: 'pie',
+                data: {
+                    labels: groups.map(function (g) { return g.category; }),
+                    datasets: [{
+                        data: groups.map(function (g) { return g.values[0] || 0; }),
+                        backgroundColor: pieColors.slice(0, groups.length),
+                        borderColor: pieBorders.slice(0, groups.length),
+                        borderWidth: 2,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 }, color: '#176d8a', padding: 12, usePointStyle: true, pointStyleWidth: 10 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+                                    var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                    return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        /* ===== Per-Category Charts ===== */
+        groups.forEach(function (g) {
+
+            // Bar chart: full breakdown
+            var barCtx = document.getElementById('trBarChart_' + g.idx);
+            if (barCtx) {
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: g.labels,
+                        datasets: [{
+                            label: g.category,
+                            data: g.values,
+                            backgroundColor: barColors.slice(0, g.labels.length),
+                            borderColor: barBorders.slice(0, g.labels.length),
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (ctx) { return ' ' + ctx.label + ': ' + ctx.parsed.x; }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { font: { size: 10 }, color: '#176d8a', stepSize: 1 }, grid: { color: 'rgba(31,153,190,0.08)' } },
+                            y: { ticks: { font: { size: 11, weight: 'bold' }, color: '#176d8a' }, grid: { display: false } }
+                        }
+                    }
+                });
+            }
+
+            // Doughnut chart: Pending / Approved / Approved w/ Comments / Rejected
+            var dCtx = document.getElementById('trDoughnutChart_' + g.idx);
+            if (dCtx) {
+                var dLabels = ['Pending', 'Approved', 'Approved w/ Comments', 'Rejected'];
+                var dValues = [g.values[1] || 0, g.values[3] || 0, g.values[4] || 0, g.values[5] || 0];
+                new Chart(dCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: dLabels,
+                        datasets: [{
+                            data: dValues,
+                            backgroundColor: doughnutColors,
+                            borderColor: doughnutBorders,
+                            borderWidth: 2,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '45%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 10 }, color: '#176d8a', padding: 10, usePointStyle: true, pointStyleWidth: 10 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function (ctx) {
+                                        var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+                                        var pct = total > 0 ? Math.round(ctx.parsed * 100 / total) : 0;
+                                        return ' ' + ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    })();
+    </script>
+    <script>
+    /* Download Excel handler */
+    (function () {
+        var btn = document.getElementById('downloadStatusExcelBtn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            var sel = document.getElementById('projectSelect');
+            var pid = sel ? sel.value : '';
+            if (!pid) { alert('Please select a project first.'); return; }
+            window.location.href = '/Home/ExportTransmittalStatus?projectId=' + encodeURIComponent(pid);
+        });
+    })();
+    </script>
+    <script>
+    /* Searchable select widget */
+    (function () {
+        function makeSearchableSelect(sel) {
+            if (!sel || sel.dataset.searchable) return;
+            sel.dataset.searchable = '1';
+            sel.style.display = 'none';
+            var wrap = document.createElement('div');
+            wrap.className = 'ss-wrap';
+            if (sel.classList.contains('w350')) wrap.classList.add('w350');
+            sel.parentNode.insertBefore(wrap, sel);
+            wrap.appendChild(sel);
+            var input = document.createElement('input');
+            input.type = 'text'; input.className = 'ss-input';
+            input.setAttribute('autocomplete', 'off'); input.setAttribute('spellcheck', 'false');
+            wrap.appendChild(input);
+            var list = document.createElement('div');
+            list.className = 'ss-list'; wrap.appendChild(list);
+
+            var opts = [];
+            for (var i = 0; i < sel.options.length; i++) {
+                opts.push({ value: sel.options[i].value, text: sel.options[i].text, selected: sel.options[i].selected });
+            }
+
+            function render(filter) {
+                list.innerHTML = '';
+                var f = (filter || '').toLowerCase();
+                var any = false;
+                opts.forEach(function (o) {
+                    if (f && o.text.toLowerCase().indexOf(f) === -1) return;
+                    any = true;
+                    var d = document.createElement('div');
+                    d.className = 'ss-item' + (o.value === sel.value ? ' ss-active' : '');
+                    d.textContent = o.text; d.dataset.val = o.value;
+                    d.addEventListener('mousedown', function (e) {
+                        e.preventDefault(); sel.value = o.value; input.value = o.text;
+                        close(); sel.dispatchEvent(new Event('change'));
+                    });
+                    list.appendChild(d);
+                });
+                if (!any) { var em = document.createElement('div'); em.className = 'ss-empty'; em.textContent = 'No matches'; list.appendChild(em); }
+            }
+
+            function open() { wrap.classList.add('ss-open'); render(input.value !== getSelectedText() ? input.value : ''); list.style.display = 'block'; }
+            function close() { wrap.classList.remove('ss-open'); list.style.display = 'none'; }
+            function getSelectedText() { var o = sel.options[sel.selectedIndex]; return o ? o.text : ''; }
+
+            input.value = getSelectedText();
+            input.addEventListener('focus', open);
+            input.addEventListener('input', function () { render(input.value); list.style.display = 'block'; });
+            input.addEventListener('blur', function () { setTimeout(close, 200); input.value = getSelectedText(); });
+
+            sel.addEventListener('change', function () { input.value = getSelectedText(); });
+        }
+        document.querySelectorAll('select.searchable-select').forEach(makeSearchableSelect);
+    })();
+    </script>
+}

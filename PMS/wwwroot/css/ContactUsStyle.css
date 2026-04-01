@@ -1,0 +1,411 @@
+﻿body {
+    font-family: Calibri, Arial, Helvetica, sans-serif;
+    background-color: #fff8eb;
+    margin: 0;
+    padding: 0;
+    color: rgb(26, 109, 134);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+h1 {
+    color: #1f99be;
+    text-align: left;
+    font-size: 2.2em;
+    font-weight: bold;
+    margin: 18px 0 18px 18px;
+    flex-shrink: 0;
+}
+
+.main-logo {
+    height: 1.2em;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+/* Main Content */
+.container-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex: 1;
+    width: 100%;
+    padding: 40px 0 100px;
+    box-sizing: border-box;
+}
+
+.contact-container {
+    max-width: 800px;
+    width: 90%;
+    margin: 0 auto;
+    box-sizing: border-box;
+    background: #faf2e3;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+    border: 1px solid #e6d9bc;
+}
+
+    .contact-container h2 {
+        text-align: center;
+        color: #176d8a;
+        margin-bottom: 25px;
+        font-size: 2.2em;
+        font-weight: bold;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .contact-container form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 100%;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+.form-group {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.contents-group {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    flex: 0 0 110px;
+    text-align: left;
+    margin-right: 15px;
+    color: #176d8a;
+    font-weight: bold;
+    margin-bottom: 0;
+    font-size: 1.05em;
+}
+
+.contents-label {
+    margin-bottom: 2px;
+    width: 100%;
+    color: #176d8a;
+    font-weight: bold;
+    font-size: 1.05em;
+}
+
+.form-group input {
+    flex: 1;
+    padding: 9px 11px;
+    border: 1.5px solid #176d8a;
+    color: #176d8a;
+    text-align: left;
+    box-sizing: border-box;
+    border-radius: 5px;
+    font-size: 1em;
+    background: #fff;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+    .form-group input:focus {
+        border-color: #1f99be;
+        box-shadow: 0 0 8px rgba(31, 153, 190, 0.3);
+        outline: none;
+    }
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+button[type="submit"] {
+    width: 200px;
+    min-width: 200px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    box-sizing: border-box;
+    font-size: 1.1em;
+    padding: 11px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s, transform 0.2s;
+    background-color: #1f99be;
+    color: #fff;
+    border: none;
+    box-shadow: 0 3px 8px rgba(31, 153, 190, 0.25);
+}
+
+    button[type="submit"]:hover {
+        background-color: #176d8a;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 12px rgba(31, 153, 190, 0.35);
+    }
+
+    button[type="submit"]:active {
+        transform: translateY(0);
+    }
+
+/* Toolbar Styles */
+.toolbar-container {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.toolbar-label {
+    margin-bottom: 5px;
+    display: block;
+    color: #176d8a;
+    font-weight: bold;
+}
+
+.format-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 5px;
+    background: #f0e6d0;
+    border-radius: 5px;
+    border: 1px solid #d6c9ab;
+    margin-top: 5px;
+}
+
+    .format-toolbar button,
+    .format-toolbar select {
+        height: 28px;
+        min-width: 28px;
+        padding: 0 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+        .format-toolbar button:hover {
+            background: #e6f6fa;
+        }
+
+        .format-toolbar button.active {
+            background-color: #1f99be;
+            color: white;
+            border-color: #176d8a;
+        }
+
+    .format-toolbar select {
+        min-width: 80px;
+    }
+
+.color-picker {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    overflow: hidden;
+}
+
+/* Remove the inner swatch padding/border (Chromium/Edge/Safari) */
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+.color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 3px;
+}
+
+/* Do not paint hover background to avoid a perceived inner line */
+.color-picker:hover {
+    background: none;
+}
+
+/* Optional: focus ring without inner line */
+.color-picker:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(31, 153, 190, 0.25);
+}
+
+/* Text Box */
+#contents {
+    height: 200px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d6c9ab;
+    border-radius: 5px;
+    background: white;
+    resize: vertical;
+    box-sizing: border-box;
+    margin-top: 5px;
+    line-height: 1.5;
+    overflow-y: auto;
+}
+
+    #contents:focus {
+        border-color: #1f99be;
+        box-shadow: 0 0 8px rgba(31, 153, 190, 0.3);
+        outline: none;
+    }
+
+/* Back to Login Link */
+.back-to-login-container {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 18px;
+    border-top: 1px dashed #c4b99b;
+}
+
+.back-to-login-link {
+    color: #1f99be;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.05em;
+    transition: color 0.2s;
+}
+
+    .back-to-login-link:hover {
+        color: #176d8a;
+        text-decoration: underline;
+    }
+
+/* Fixed Footer Styling */
+.footer {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;   /* center the middle block */
+    align-items: center;
+    background: #faf2e3;
+    padding: 12px 15px 12px 15px;
+    border-top: 1.5px solid #1f99be;
+    font-size: 0.95em;
+    color: #176d8a;
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+/* Do not let side columns push the center off-center */
+.footer-left,
+.footer-right {
+    flex: 0 0 auto;
+}
+
+/* Make the center content size to its content and center-align */
+.footer-center {
+    flex: 0 0 auto;            /* override previous flex: 40 */
+    text-align: center;
+    margin: 0 auto;            /* ensure centering within flex line */
+}
+
+/* Keep the logo absolutely positioned so it does not affect centering */
+.footer-logo {
+    height: 80px;
+    width: auto;
+    border-radius: 6px;
+    border: 1.5px solid #1f99be;
+    position: absolute;
+    right: 15px;
+    bottom: 8px;
+    z-index: 1002;
+    background-color: #faf2e3;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+/* Responsive: stack and keep centered */
+@media (max-width: 768px) {
+    .footer {
+        flex-direction: column;
+        text-align: center;
+        padding: 12px;
+        min-height: auto;
+    }
+    .footer-center, .footer-right { width: 100%; }
+    .footer-logo { position: relative; right: auto; bottom: auto; margin: 8px auto; height: 60px; }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.3em;
+        margin: 8px 0 8px 8px;
+    }
+
+    .container-wrapper {
+        padding: 20px 0 80px;
+    }
+
+    .contact-container h2 {
+        font-size: 1.6em;
+    }
+
+    button[type="submit"] {
+        width: 100%;
+        min-width: auto;
+        font-size: 1em;
+    }
+
+    .footer {
+        position: fixed;
+        flex-direction: column;
+        padding: 10px;
+    }
+
+    .footer-left {
+        display: none;
+    }
+
+    .footer-center {
+        font-size: 0.9em;
+    }
+
+    .footer-logo {
+        height: 55px;
+    }
+
+    #contents {
+        height: 150px;
+        min-height: 150px;
+    }
+
+    .format-toolbar {
+        margin: 0;
+        padding: 3px;
+        gap: 2px;
+    }
+
+        .format-toolbar button,
+        .format-toolbar select {
+            padding: 2px 4px;
+            height: 24px;
+            font-size: 0.75em;
+        }
+}
+
+/* Accessible error text (match Login) */
+.error-text {
+    color: #ED1E4D;
+    text-align: center;
+    text-decoration: underline;
+    font-weight: bold;
+    font-style: italic;
+}
+
+/* Inline field error for password mismatch (used in SignUp) */
+.password-match-error {
+    color: #ED1E4D;
+    font-size: 0.9em;
+    margin-top: 5px;
+    display: none;
+}

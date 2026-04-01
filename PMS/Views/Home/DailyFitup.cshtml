@@ -1,0 +1,1231 @@
+﻿@model PMS.Models.DfrDailyFitupViewModel
+@{
+    Layout = null;
+    var antiForgery = Html.AntiForgeryToken();
+    var headerView = string.IsNullOrWhiteSpace(Model.HeaderView)
+        ? "DWG"
+        : Model.HeaderView!.Trim();
+    // Removed Released DFR (AllHold) mapping
+    var headerViewDisplay = headerView; // direct
+    // Prepare values for date inputs
+    string dateFilterSubmitValue = string.Empty;
+    if (!string.IsNullOrWhiteSpace(Model.SearchFitupDate) && DateTime.TryParse(Model.SearchFitupDate, out var _dfParsed))
+    {
+        dateFilterSubmitValue = _dfParsed.ToString("yyyy-MM-dd"); // for HTML date input
+    }
+    string fitupHeaderDateValue = Model.FitupDateHeader ?? string.Empty; // expecting dd-MMM-yyyy hh:mm tt
+    if (!string.IsNullOrWhiteSpace(fitupHeaderDateValue) && DateTime.TryParse(fitupHeaderDateValue, out var _fhParsed))
+    {
+        // datetime-local expects: yyyy-MM-dd'T'HH:mm (24h)
+        fitupHeaderDateValue = _fhParsed.ToString("yyyy-MM-dd'T'HH:mm");
+    }
+
+    // Prepare sorted lists to ensure consistent ordering on client
+    var sortedLocationOptions = (Model.LocationOptions ?? new List<string>()).ToList(); // preserve DB order by LO_ID; do not sort alphabetically
+    var jAddOptionsOrdered = (Model.JAddOptions ?? new List<string>()).ToList(); // preserve DB order by Add_ID; do not sort alphabetically
+    // IMPORTANT: preserve server-provided weld type order (by PMS_Weld_Type_tbl.W_Type_ID ASC); do NOT sort here
+    var weldTypeOptionsOrdered = (Model.WeldTypeOptions ?? new List<string>()).ToList();
+    // Preserve controller order (MATD_SN asc) - do not resort here
+    var sortedMaterialDescriptions = (Model.MaterialDescriptions ?? new List<string>()).ToList();
+    // Preserve controller order (Material_tbl.MAT_SN asc) - do NOT sort here
+    var sortedMaterialGrades = (Model.MaterialGrades ?? new List<string>()).ToList();
+
+    // Precompute default weld type selections for reuse in UI + JS serialization
+    var defaultWeldTypeList = (Model.DefaultWeldTypes != null && Model.DefaultWeldTypes.Count > 0)
+        ? Model.DefaultWeldTypes.ToList()
+        : (!string.IsNullOrWhiteSpace(Model.DefaultWeldType)
+            ? new List<string> { Model.DefaultWeldType }
+            : ((Model.WeldTypeOptions != null && Model.WeldTypeOptions.Count > 0)
+                ? new List<string> { Model.WeldTypeOptions[0] }
+                : new List<string> { "BW", "SW", "BR", "LET", "FW", "SP", "RP", "SOF", "DM" }));
+
+    var rfiOptions = Model.RfiOptions ?? new List<PMS.Models.RfiOption>();
+    // Use full RFI Display for header dropdown (preserve prefixes like 'WS | ', 'FW | ', 'TH | ')
+    var rfiForHeader = rfiOptions
+        .Select(rr => new
+        {
+            Id = rr.Id,
+            Display = string.IsNullOrWhiteSpace(rr.Display) ? (rr.Id.ToString() ?? string.Empty) : rr.Display
+        })
+        .ToList();
+
+    // If TH weld type exists in options, ensure 'Threaded' appears in location options (header only)
+    var hasThWeld = weldTypeOptionsOrdered.Any(wt => !string.IsNullOrWhiteSpace(wt) && wt.IndexOf("TH", StringComparison.OrdinalIgnoreCase) >= 0);
+    if (hasThWeld && !sortedLocationOptions.Any(x => string.Equals(x, "Threaded", StringComparison.OrdinalIgnoreCase))) { sortedLocationOptions.Add("Threaded"); }
+    var showConfirmButton = string.Equals(headerView, "Date", StringComparison.OrdinalIgnoreCase);
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>PMS - Daily Fit-up</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/DailyFitup.css" asp-append-version="true" />
+</head>
+<body>
+    @await Html.PartialAsync("~/Views/Shared/_DashboardHeader.cshtml")
+
+    <div class="fitup-header">
+        <form method="get" asp-action="DailyFitup" asp-controller="Home" id="filterForm">
+            <input type="hidden" name="doLoad" id="doLoadInput" value="@Context.Request.Query["doLoad"].ToString()" />
+            <div class="row">
+                <label for="projectSelect">Project No.</label>
+                <select name="projectId" id="projectSelect" class="header-fixed w350 searchable-select" asp-for="SelectedProjectId" asp-items="@(new SelectList(Model.Projects.Select(p => new { Id = p.Id, Display = p.Id + " - " + p.Name }), "Id", "Display", Model.SelectedProjectId))"></select>
+                <label for="headerViewSelect">View</label>
+                <select name="headerView" id="headerViewSelect" class="header-fixed view-select">
+                    @{
+                        string[] hvOpts = new[] { "DWG", "Date", "Report" };
+                        foreach (var hv in hvOpts)
+                        {
+                            if (string.Equals(hv, headerView, System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@hv" selected="selected">@hv</option>
+                            }
+                            else
+                            {
+                                <option value="@hv">@hv</option>
+                            }
+                        }
+                    }
+                </select>
+                <label for="locationSelect">Location</label>
+                <select name="location" id="locationSelect">
+                    @{
+                        // Keep All/Shop/Field choices for header behavior and include 'Threaded' if TH weld type exists
+                        var locs = hasThWeld ? new[] { "All", "Shop", "Field", "Threaded" } : new[] { "All", "Shop", "Field" };
+                        foreach (var loc in locs)
+                        {
+                            if (string.Equals(Model.SelectedLocation, loc, System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@loc" selected="selected">@loc</option>
+                            }
+                            else
+                            {
+                                <option value="@loc">@loc</option>
+                            }
+                        }
+                    }
+                </select>
+                @if (headerView == "DWG")
+                {
+                    <label for="layoutSelect">Layout</label>
+                    <select name="layout" id="layoutSelect" class="header-fixed w130 searchable-select">
+                        @foreach (var l in Model.LayoutOptions ?? new List<string>())
+                        {
+                            if (string.Equals(l, Model.SearchLayout, System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@l" selected="selected">@l</option>
+                            }
+                            else
+                            {
+                                <option value="@l">@l</option>
+                            }
+                        }
+                    </select>
+                    <label for="sheetSelect">Sheet</label>
+                    <select name="sheet" id="sheetSelect" class="header-fixed searchable-select">
+                        @foreach (var s in Model.SheetOptions ?? new List<string>())
+                        {
+                            if (string.Equals(s, Model.SearchSheet, System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@s" selected="selected">@s</option>
+                            }
+                            else
+                            {
+                                <option value="@s">@s</option>
+                            }
+                        }
+                        }
+                    </select>
+                    if (!string.IsNullOrWhiteSpace(Model.SearchLayout) && string.IsNullOrWhiteSpace(Model.SearchSheet))
+                    {
+                        <span class="hint">All sheets for layout will be loaded</span>
+                    }
+                }
+                else if (headerView == "Date")
+                {
+                    <label class="alt-filter-label" for="fitupDateFilter">Fit-up Date</label>
+                    <input id="fitupDateFilter" type="date" name="fitupDateFilter" class="header-fixed w150" value="@dateFilterSubmitValue" />
+                }
+                else if (headerView == "Report")
+                {
+                    <label class="alt-filter-label" for="fitupReportFilter">Fit-up Report</label>
+                    <input id="fitupReportFilter" name="fitupReportFilter" class="header-fixed w130" value="@Model.SearchFitupReport" placeholder="Report No" />
+                }
+            </div>
+            <div class="row ref-line">
+                <div class="ref-boxes">
+                    <div class="ref-box"><span>Line Class: @Model.LineClass</span></div>
+                    <div class="ref-box"><span>Material: @Model.LineMaterial</span></div>
+                    <div class="ref-box"><span>Category: @Model.LineCategory</span></div>
+                    <div class="ref-box"><span>RT Shop: @(Model.RtShop.HasValue ? (Model.RtShop.Value * 100).ToString("0.##") + "%" : null)</span></div>
+                    <div class="ref-box"><span>RT Field: @(Model.RtField.HasValue ? (Model.RtField.Value * 100).ToString("0.##") + "%" : null)</span></div>
+                    <div class="ref-box"><span>PWHT Y/N: @(Model.PwhtYN == true ? "Y" : Model.PwhtYN == false ? "N" : null)</span></div>
+                    <div class="ref-box"><span>PWHT >20mm: @(Model.Pwht20mm.HasValue ? (Model.Pwht20mm.Value ? "Y" : "N") : null)</span></div>
+                    <div class="ref-box"><span>REV: @Model.LsRev</span></div>
+                </div>
+            </div>
+            <div class="row section-band">
+                @if (Model.SelectedLocation == "All")
+                {
+                    <label for="fitupReportCombinedInput">Fit-up Report (WS/FW/TH)</label>
+                    <input id="fitupReportCombinedInput" name="FitupReportCombined" class="header-fixed w230" value="@(                                                                                                              string.IsNullOrWhiteSpace(Model.FitupReportShop) && string.IsNullOrWhiteSpace(Model.FitupReportField) && string.IsNullOrWhiteSpace(Model.FitupReportThreaded)
+                                                                                                              ? string.Empty
+                                                                                                              : string.Join(" / ", new[] { Model.FitupReportShop ?? string.Empty, Model.FitupReportField ?? string.Empty, Model.FitupReportThreaded ?? string.Empty })
+                                                                                                           )" title="Workshop / Field / Threaded" />
+                }
+                else
+                {
+                    <label for="fitupReportHeaderInput">Fit-up Report</label>
+                    <input id="fitupReportHeaderInput" name="FitupReportHeader" class="header-fixed w110" value="@Model.FitupReportHeader" />
+                }
+                <label for="rfiSelect">RFI No.</label>
+                <select name="SelectedRfiId" asp-for="SelectedRfiId" id="rfiSelect" class="header-fixed w580" asp-items="@(new SelectList(rfiForHeader, "Id", "Display", Model.SelectedRfiId))">
+                    <option value="" selected="@(Model.SelectedRfiId == null || string.IsNullOrWhiteSpace(Model.SelectedRfiId.ToString()) ? "selected" : null)"></option>
+                </select>
+                <label for="FitupDate">Fit-up Date</label>
+                <input id="fitupDateInput" type="datetime-local" name="date" class="header-fixed w180" value="@fitupHeaderDateValue" />
+                <label for="tackerSelect">Tacker</label>
+                <select name="SelectedTacker" asp-for="SelectedTacker" id="tackerSelect" class="header-fixed w110 searchable-select" asp-items="@(new SelectList(Model.TackerOptions, "Symbol", "Symbol", Model.SelectedTacker))"></select>
+            </div>
+        </form>
+        <div class="weld-filters" id="weldFilters">
+            <strong>Weld Type</strong>
+            @{
+                // Derive dynamic list of weld types (project / dataset specific or fallback set)
+                var dynamicWeldTypes = (weldTypeOptionsOrdered != null && weldTypeOptionsOrdered.Count > 0)
+                ? weldTypeOptionsOrdered
+                : new List<string> { "BW", "SW", "BR", "LET", "FW", "SP", "RP", "SOF", "DM", "TH", "FJ" };
+                // Default checked precedence:
+                //1. If a list DefaultWeldTypes is provided and non-empty, use exactly those
+                //2. Else if a single DefaultWeldType provided, use that
+                //3. Else if project-specific WeldTypeOptions exist, use only the first (avoid auto-checking all)
+                //4. Else fallback to legacy subset for generic list
+                var defaultChecked = new HashSet<string>(defaultWeldTypeList ?? new List<string> { });
+                foreach (var wt in dynamicWeldTypes)
+                {
+                    var isChecked = defaultChecked.Contains(wt);
+                    if (isChecked)
+                    {
+                        <label title="@wt"><input type="checkbox" class="wt-filter" value="@wt" checked="checked" />@wt</label>
+                    }
+                    else
+                    {
+                        <label title="@wt"><input type="checkbox" class="wt-filter" value="@wt" />@wt</label>
+                    }
+                }
+            }
+            <div class="wf-actions">
+                <button type="button" id="wfAll">All</button>
+                <button type="button" id="wfNone">None</button>
+                <button type="button" id="wfDefault">Default</button>
+            </div>
+        </div>
+        <button type="button" id="filterToggle" class="filter-toggle-btn" aria-expanded="true">Hide Filters</button>
+    </div>
+
+    <div class="toolbar">
+        <div class="tb-left">
+            @if (headerView == "DWG")
+            {
+                <button id="addRowBtn" type="button" class="btn btn-primary">Add Joint</button>
+            }
+            <button id="saveAllBtn" type="button" class="btn btn-primary">Save</button>
+            <button id="completeBtn" type="button" class="btn btn-primary">Daily Fit-up Completed</button>
+            @if (showConfirmButton)
+            {
+                <button id="confirmBtn" type="button" class="btn btn-primary">Daily Fit-up Confirmed</button>
+            }
+            @* New DWG buttons *@
+            @if (headerView == "DWG")
+            {
+                <button id="openDwgBtn" type="button" class="btn btn-outline">Open DWG</button>
+            }
+            <button id="downloadDwgBtn" type="button" class="btn btn-outline">Download DWG</button>
+            <span id="statusMsg" style="font-weight:600; margin-left:10px;"></span>
+        </div>
+        <div class="tb-title">Daily Fit-up (@headerViewDisplay)</div>
+        <div class="tb-right">
+            @if (headerView != "DWG")
+            {
+                <button id="clearRemarksBtn" type="button" class="btn btn-primary">Clear Remarks</button>
+                <button id="confirmAllBtn" type="button" class="btn btn-outline">Confirm All</button>
+                <button id="unconfirmAllBtn" type="button" class="btn btn-outline">Unconfirm All</button>
+            }
+            <button id="loadBtn" type="submit" form="filterForm" name="doLoad" value="1" class="btn btn-primary">Load</button>
+        </div>
+    </div>
+
+    @if (Model?.IsTruncated == true && Model.RowLimit > 0)
+    {
+        <div class="alert info" style="margin:8px 16px;">Showing first @Model.RowLimit rows. Refine filters to view a smaller, complete set.</div>
+    }
+
+    @* Client-side placeholder for pending reload *@
+    @{
+        var showClientNoData = (Model?.Rows == null || Model.Rows.Count == 0);
+    }
+    <div id="clientNoData" class="no-data" style="@(showClientNoData ? string.Empty : "display:none;")">
+        No data loaded. @if(headerView=="DWG"){
+        <text>Select Layout (and optionally Sheet) then press Load.</text>
+                } else if (headerView == "Date")
+        {
+
+            <text>Select Date view then press Load.</text>
+        }
+        else if (headerView == "Report")
+        {
+
+            <text>Select Report view, enter a report filter (optional) then press Load.</text>
+        }
+    </div>
+
+    @if (Model?.Rows == null || Model.Rows.Count == 0)
+    {
+    }
+    else
+    {
+        <div class="scroll-sync" id="scrollSync">
+            <div class="table-wrapper" id="tableWrapper">
+                <div class="table-inner" id="tableInner">
+                    <table class="fitup" id="fitupTable">
+                        <thead>
+                            <tr>
+                                <th class="col-sn">S/N</th>
+                                @if (headerView != "DWG")
+                                {
+                                    <th class="col-layout">Layout</th>
+                                }
+                                <th class="col-location">Location</th>
+                                <th class="col-jointno">Joint No.</th>
+                                <th class="col-jadd">J-Add</th>
+                                <th class="col-wtype">Weld Type</th>
+                                <th class="col-sheet">Sheet</th>
+                                <th class="col-rev">REV.</th>
+                                <th class="col-spno">SP. No.</th>
+                                <th class="col-dia">Dia. In.</th>
+                                <th class="col-sch">Sch.</th>
+                                <th class="col-matA">Material A</th>
+                                <th class="col-matB">Material B</th>
+                                <th class="col-gradeA">Grade A</th>
+                                <th class="col-gradeB">Grade B</th>
+                                <th class="col-heatA">Heat Number A</th>
+                                <th class="col-heatB">Heat Number B</th>
+                                <th class="col-frep">Fit-up Report</th>
+                                <th class="col-rfi">RFI No.</th>
+                                <th class="col-fdate">Fit-up Date</th>
+                                <th class="col-wps">WPS</th>
+                                <th class="col-tacker">Tack Welder</th>
+                                <th class="col-olDia">OL Dia. In.</th>
+                                <th class="col-olSch">OL Sch.</th>
+                                <th class="col-olThick">Actual Thick.</th>
+                                <th class="col-del">Deleted</th>
+                                <th class="col-can">Cancelled</th>
+                                <th class="col-conf">Confirmed</th>
+                                <th class="col-remarks">Remarks</th>
+                                <th class="col-updby">Updated By</th>
+                                <th class="col-upddate">Updated Date</th>
+                                @if (headerView != "DWG")
+                                {
+                                    <th class="col-dwg">DWG</th>
+                                }
+                                <th class="col-clear">Clear</th>
+                                <th class="col-delbtn">Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                var sn = 0;
+                                foreach (var r in Model.Rows)
+                                {
+                                    var locked = r.FitupConfirmed;
+                                    string rowFitupDateVal = r.FitupDate ?? string.Empty;
+                                    if (!string.IsNullOrWhiteSpace(rowFitupDateVal) && DateTime.TryParse(rowFitupDateVal, out var _rowFdt))
+                                    {
+                                        rowFitupDateVal = _rowFdt.ToString("yyyy-MM-dd'T'HH:mm");
+                                    }
+                                    <tr data-id="@r.JointId" data-lineclass="@r.LineClass" class="@(locked ? "locked" : null)">
+                                        <td class="col-sn">@(++sn)</td>
+                                        @if (headerView != "DWG")
+                                        {
+                                            <td class="col-layout">@r.LayoutNumber</td>
+                                        }
+                                        <td class="col-location">
+                                            @if (locked)
+                                            {
+                                                <select data-name="Location" name="Location" id="Location_@r.JointId" disabled>
+                                                    <option value="@r.Location">@r.Location</option>
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                var locList = (sortedLocationOptions != null && sortedLocationOptions.Count > 0) ? new List<string>(sortedLocationOptions) : new List<string>();
+                                                // Remove 'Threaded' from row-level dropdown options
+                                                locList = locList.Where(x => !string.Equals(x, "Threaded", StringComparison.OrdinalIgnoreCase)).ToList();
+                                                if (!string.IsNullOrWhiteSpace(r.Location) && !locList.Any(x => string.Equals(x, r.Location, System.StringComparison.OrdinalIgnoreCase))) { locList.Add(r.Location!); }
+                                                <select data-name="Location" name="Location" id="Location_@r.JointId">
+                                                    @foreach (var locOpt in locList)
+                                                    {
+                                                        if (string.Equals(locOpt, r.Location, System.StringComparison.OrdinalIgnoreCase))
+                                                        {
+                                                            <option value="@locOpt" selected="selected">@locOpt</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option value="@locOpt">@locOpt</option>
+                                                        }
+                                                    }
+                                                </select>
+                                            }
+                                        </td>
+                                        <td class="col-jointno @(r.DfrOnHold ? "hold-alert" : null)">@if(locked){
+                                        <input data-name="WeldNumber" name="WeldNumber" id="WeldNumber_@r.JointId" value="@r.WeldNumber" disabled />
+                                    } else
+                                    {
+
+                                        <input data-name="WeldNumber" name="WeldNumber" id="WeldNumber_@r.JointId" value="@r.WeldNumber" />
+                                    }
+        </td>
+                                    <td class="col-jadd">
+                                        <select data-name="JAdd" name="JAdd" id="JAdd_@r.JointId" @(locked ? "disabled" : null)>
+                                            @{
+                                                var jAddList = (jAddOptionsOrdered != null && jAddOptionsOrdered.Count > 0) ? new List<string>(jAddOptionsOrdered) : new List<string>();
+                                                if (!string.IsNullOrWhiteSpace(r.JAdd) && !string.Equals(r.JAdd, "NEW", System.StringComparison.OrdinalIgnoreCase) && !jAddList.Any(x => string.Equals(x, r.JAdd, System.StringComparison.OrdinalIgnoreCase))) { jAddList.Add(r.JAdd!); }
+                                            }
+                                            @foreach (var j in jAddList)
+                                            {
+                                                if (string.Equals(j, r.JAdd, System.StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <option value="@j" selected="selected">@j</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@j">@j</option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+                                    <td class="col-wtype">
+                                        <select data-name="WeldType" name="WeldType" id="WeldType_@r.JointId" @(locked ? "disabled" : null)>
+                                            @{
+                                                var wtOpts = (weldTypeOptionsOrdered != null && weldTypeOptionsOrdered.Count > 0) ? new List<string>(weldTypeOptionsOrdered) : new List<string>();
+                                                if (!string.IsNullOrWhiteSpace(r.WeldType) && !wtOpts.Any(x => string.Equals(x, r.WeldType, System.StringComparison.OrdinalIgnoreCase))) { wtOpts.Add(r.WeldType!); }
+                                                var fallbackDefault = Model.DefaultWeldType
+                                                ?? (Model.DefaultWeldTypes != null && Model.DefaultWeldTypes.Count > 0 ? Model.DefaultWeldTypes[0] : null)
+                                                ?? wtOpts.FirstOrDefault()
+                                                ?? string.Empty;
+                                                var selectedWeldType = string.IsNullOrWhiteSpace(r.WeldType) ? fallbackDefault : r.WeldType;
+                                            }
+                                            @foreach (var wt in wtOpts)
+                                            {
+                                                if (string.Equals(wt, selectedWeldType, System.StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <option value="@wt" selected="selected">@wt</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@wt">@wt</option>
+                                                }
+                                            }
+                                        </select>
+                                    </td>
+                                    <td class="col-sheet @(r.SheetOnHold ? "hold-alert" : null)">@if(locked){
+                                    <input data-name="Sheet" name="Sheet" id="Sheet_@r.JointId" value="@r.Sheet" disabled />
+                                } else
+                                {
+
+                                    <input data-name="Sheet" name="Sheet" id="Sheet_@r.JointId" value="@r.Sheet" />
+                                }
+    </td>
+                                <td><input data-name="Rev" name="Rev" id="Rev_@r.JointId" value="@r.Rev" @(locked ? "disabled" : null) /></td>
+                                <td class="col-spno @(r.SpOnHold ? "hold-alert" : null)"><input data-name="SpoolNo" name="SpoolNo" id="SpoolNo_@r.JointId" value="@r.SpoolNo" @(locked ? "disabled" : null) /></td>
+                                <td class="col-dia"><input data-name="DiaIn" name="DiaIn" id="DiaIn_@r.JointId" value="@r.DiaIn" @(locked ? "disabled" : null) class="dia-input" /></td>
+                                <td class="col-sch"><input data-name="Sch" name="Sch" id="Sch_@r.JointId" value="@r.Sch" @(locked ? "disabled" : null) class="sch-input" /></td>
+                                <td>
+                                    @{
+
+                                        var matListA = (sortedMaterialDescriptions != null && sortedMaterialDescriptions.Count > 0) ? new List<string>(sortedMaterialDescriptions) : new List<string>();
+                                        var curMatA = r.MaterialA ?? string.Empty;
+                                        if (!string.IsNullOrWhiteSpace(curMatA) && !matListA.Any(x => string.Equals(x, curMatA, StringComparison.OrdinalIgnoreCase))) { matListA.Add(curMatA); }
+                                    }
+                                    <select data-name="MaterialA" name="MaterialA" id="MaterialA_@r.JointId" class="searchable-select" @(locked ? "disabled" : null)>
+                                        @foreach (var m in matListA)
+                                        {
+                                            if (string.Equals(m, r.MaterialA, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@m" selected>@m</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@m">@m</option>
+                                            }
+                                        }
+                                        @if (string.IsNullOrWhiteSpace(r.MaterialA))
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                        else
+                                        {
+                                            <option value=""></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    @{
+
+                                        var matListB = (sortedMaterialDescriptions != null && sortedMaterialDescriptions.Count > 0) ? new List<string>(sortedMaterialDescriptions) : new List<string>();
+                                        var curMatB = r.MaterialB ?? string.Empty;
+                                        if (!string.IsNullOrWhiteSpace(curMatB) && !matListB.Any(x => string.Equals(x, curMatB, StringComparison.OrdinalIgnoreCase))) { matListB.Add(curMatB); }
+                                    }
+                                    <select data-name="MaterialB" name="MaterialB" id="MaterialB_@r.JointId" class="searchable-select" @(locked ? "disabled" : null)>
+                                        @foreach (var m in matListB)
+                                        {
+                                            if (string.Equals(m, r.MaterialB, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@m" selected>@m</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@m">@m</option>
+                                            }
+                                        }
+                                        @if (string.IsNullOrWhiteSpace(r.MaterialB))
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                        else
+                                        {
+                                            <option value=""></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    @{
+
+                                        var gradeListA = (sortedMaterialGrades != null && sortedMaterialGrades.Count > 0) ? new List<string>(sortedMaterialGrades) : new List<string>();
+                                        var curGa = r.GradeA ?? string.Empty;
+                                        if (!string.IsNullOrWhiteSpace(curGa) && !gradeListA.Any(x => string.Equals(x, curGa, StringComparison.OrdinalIgnoreCase))) { gradeListA.Add(curGa); }
+                                    }
+                                    <select data-name="GradeA" name="GradeA" id="GradeA_@r.JointId" class="searchable-select" @(locked ? "disabled" : null)>
+                                        @foreach (var g in gradeListA)
+                                        {
+                                            if (string.Equals(g, r.GradeA, System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@g" selected>@g</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@g">@g</option>
+                                            }
+                                        }
+                                        @if (string.IsNullOrWhiteSpace(r.GradeA))
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                        else
+                                        {
+                                            <option value=""></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    @{
+
+                                        var gradeListB = (sortedMaterialGrades != null && sortedMaterialGrades.Count > 0) ? new List<string>(sortedMaterialGrades) : new List<string>();
+                                        var curGb = r.GradeB ?? string.Empty;
+                                        if (!string.IsNullOrWhiteSpace(curGb) && !gradeListB.Any(x => string.Equals(x, curGb, StringComparison.OrdinalIgnoreCase))) { gradeListB.Add(curGb); }
+                                    }
+                                    <select data-name="GradeB" name="GradeB" id="GradeB_@r.JointId" class="searchable-select" @(locked ? "disabled" : null)>
+                                        @foreach (var g in gradeListB)
+                                        {
+                                            if (string.Equals(g, r.GradeB, System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@g" selected>@g</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@g">@g</option>
+                                            }
+                                        }
+                                        @if (string.IsNullOrWhiteSpace(r.GradeB))
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                        else
+                                        {
+                                            <option value=""></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    @{
+
+                                        var valA = r.HeatNumberA ?? string.Empty;
+                                    }
+                                    <select data-name="HeatNumberA" name="HeatNumberA" id="HeatNumberA_@r.JointId" class="searchable-select heat-select" @(locked ? "disabled" : null)>
+                                        @if (!string.IsNullOrWhiteSpace(valA))
+                                        {
+                                            <option value="@valA" selected>@valA</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    @{
+
+                                        var valB = r.HeatNumberB ?? string.Empty;
+                                    }
+                                    <select data-name="HeatNumberB" name="HeatNumberB" id="HeatNumberB_@r.JointId" class="searchable-select heat-select" @(locked ? "disabled" : null)>
+                                        @if (!string.IsNullOrWhiteSpace(valB))
+                                        {
+                                            <option value="@valB" selected>@valB</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td class="col-frep"><input autocomplete="off" data-name="FitupReport" name="FitupReport" id="FitupReport_@r.JointId" value="@r.FitupReport" @(locked ? "disabled" : null) /></td>
+                                <td class="col-rfi">
+                                    <select data-name="RfiId" name="RfiId" id="RfiId_@r.JointId" class="searchable-select rfi-select" @(locked ? "disabled" : null)>
+                                        @if (r.RfiId.HasValue && r.RfiId.Value > 0)
+                                        {
+                                            <option value="@r.RfiId.Value" selected>@(r.RfiNo ?? r.RfiId.Value.ToString())</option>
+                                            <option value=""></option>
+                                        }
+                                        else
+                                        {
+                                            <option value="" selected></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input type="datetime-local" data-name="FitupDate" name="FitupDate" id="FitupDate_@r.JointId" value="@rowFitupDateVal" @(locked ? "disabled" : null) /></td>
+                                <td data-col="wps">
+                                    @if (r.WpsCandidates != null && r.WpsCandidates.Count > 0)
+                                    {
+                                        bool hasSelected = !string.IsNullOrWhiteSpace(r.Wps) && r.WpsCandidates.Any(c => string.Equals(c.Wps, r.Wps, StringComparison.OrdinalIgnoreCase));
+                                        <select data-name="Wps" name="Wps" id="Wps_@r.JointId" style="width:160px" @(locked ? "disabled" : null) class="wps-select">
+                                            @for (int idx = 0; idx < r.WpsCandidates.Count; idx++)
+                                            {
+                                                var cand = r.WpsCandidates[idx];
+                                                var selected = hasSelected && string.Equals(cand.Wps, r.Wps, StringComparison.OrdinalIgnoreCase);
+                                                var title = $"t: {cand.ThicknessRange ?? string.Empty} PWHT: {(cand.Pwht == true ? "Y" : "N")}";
+
+                                                if (selected)
+                                                {
+                                                    <option data-wps-id="@cand.Id" value="@cand.Wps" selected="selected" title="@title">@cand.Wps</option>
+                                                }
+                                                else
+                                                {
+                                                    <option data-wps-id="@cand.Id" value="@cand.Wps" title="@title">@cand.Wps</option>
+                                                }
+                                            }
+                                            @* Add saved WPS if not in candidates *@
+                                            @if (!hasSelected && !string.IsNullOrWhiteSpace(r.Wps))
+                                            {
+                                                <option data-wps-id="@(r.WpsId ?? 0)" value="@r.Wps" selected="selected" title="Saved">@r.Wps</option>
+                                            }
+                                            @if (string.IsNullOrWhiteSpace(r.Wps))
+                                            {
+                                                <option value="" selected="selected"></option>
+                                            }
+                                            else
+                                            {
+                                                <option value=""></option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <input data-name="Wps" name="Wps" id="Wps_@r.JointId" value="@r.Wps" @(locked ? "disabled" : null) style="width:160px" />
+                                    }
+                                </td>
+                                <td>
+                                    @{
+
+                                        var tackers = Model.TackerOptions ?? new List<PMS.Models.WelderSymbolOption>();
+                                        var symbols = tackers.Select(t => t.Symbol).ToList();
+                                        if (!string.IsNullOrWhiteSpace(r.TackWelder) && !symbols.Any(x => string.Equals(x, r.TackWelder, StringComparison.OrdinalIgnoreCase)))
+                                        {
+                                            symbols.Add(r.TackWelder!);
+                                        }
+                                    }
+                                    <select data-name="TackWelder" name="TackWelder" id="TackWelder_@r.JointId" class="searchable-select w110" @(locked ? "disabled" : null)>
+                                        @foreach (var sym in symbols)
+                                        {
+                                            if (string.Equals(sym, r.TackWelder, System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@sym" selected="selected">@sym</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@sym">@sym</option>
+                                            }
+                                        }
+                                        @if (string.IsNullOrWhiteSpace(r.TackWelder))
+                                        {
+                                            <option value="" selected="selected"></option>
+                                        }
+                                        else
+                                        {
+                                            <option value=""></option>
+                                        }
+                                    </select>
+                                </td>
+                                <td class="col-olDia"><input data-name="OlDia" name="OlDia" id="OlDia_@r.JointId" value="@r.OlDia" @(locked ? "disabled" : null) class="ol-dia-input" /></td>
+                                <td class="col-olSch"><input data-name="OlSch" name="OlSch" id="OlSch_@r.JointId" value="@r.OlSch" @(locked ? "disabled" : null) class="olsched-input" /></td>
+                                <td class="col-olThick"><input data-name="OlThick" name="OlThick" id="OlThick_@r.JointId" value="@r.OlThick" @(locked ? "disabled" : null) /></td>
+                                <td class="chk-cell"><input type="checkbox" data-name="Deleted" name="Deleted" id="Deleted_@r.JointId" @(r.Deleted ? "checked" : null) @(locked ? "disabled" : null) /></td>
+                                <td class="chk-cell"><input type="checkbox" data-name="Cancelled" name="Cancelled" id="Cancelled_@r.JointId" @(r.Cancelled ? "checked" : null) @(locked ? "disabled" : null) /></td>
+                                <td class="chk-cell"><input type="checkbox" data-name="FitupConfirmed" name="FitupConfirmed" id="FitupConfirmed_@r.JointId" @(r.FitupConfirmed ? "checked" : null) /></td>
+                                <td><input data-name="Remarks" name="Remarks" id="Remarks_@r.JointId" value="@r.Remarks" @(locked ? "disabled" : null) /></td>
+                                <td class="readonly col-updby">@r.UpdatedBy</td>
+                                <td class="readonly col-upddate">@r.UpdatedDate</td>
+                                @if (headerView != "DWG")
+                                {
+                                    <td class="col-dwg row-actions"><button type="button" class="open-dwg-row btn btn-outline" data-layout="@r.LayoutNumber" data-sheet="@r.Sheet">Open DWG</button></td>
+                                }
+                                <td class="row-actions"><button type="button" class="clear-row btn btn-outline" @(r.FitupConfirmed ? "disabled" : null)>Clear</button></td>
+                                <td class="row-actions"><button type="button" class="delete-row btn btn-danger" @(r.FitupConfirmed ? "disabled" : null)>Del</button></td>
+                            </tr>
+                        }
+                                            }
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+    <div class="bottom-scroll" id="bottomScroll">
+        <div class="bottom-scroll-inner" id="bottomScrollInner"></div>
+    </div>
+</div>
+    }
+
+    @await Html.PartialAsync("~/Views/Shared/_DashboardFooter.cshtml")
+
+    <div class="modal" id="confirmDeleteRowModal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="confirmDeleteRowTitle">
+            <div class="modal-header">
+                <h2 id="confirmDeleteRowTitle" class="modal-title">Confirm Delete</h2>
+                <button class="close-modal" type="button" aria-label="Close" onclick="closeDeleteRowModal()">&times;</button>
+            </div>
+            <p id="confirmDeleteRowMessage" style="color:#176d8a; margin:0 0 16px 0;"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" onclick="closeDeleteRowModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDeleteRow()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm unconfirmed rows modal (same formatting as Delete modal) -->
+    <div class="modal" id="confirmUnconfirmedRowsModal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="confirmUnconfirmedRowsTitle">
+            <div class="modal-header">
+                <h2 id="confirmUnconfirmedRowsTitle" class="modal-title">Confirm All</h2>
+                <button class="close-modal" type="button" aria-label="Close" onclick="closeConfirmUnconfirmedRowsModal()">&times;</button>
+            </div>
+            <p id="confirmUnconfirmedRowsMessage" style="color:#176d8a; margin:0 0 16px 0;"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" onclick="closeConfirmUnconfirmedRowsModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmUnconfirmedRowsOk">Confirm All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supersede confirmation modal -->
+    <div class="modal" id="supersedeConfirmModal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="supersedeConfirmTitle">
+            <div class="modal-header">
+                <h2 id="supersedeConfirmTitle" class="modal-title">Confirm Supersede</h2>
+                <button class="close-modal" type="button" aria-label="Close" onclick="cancelSupersede()">&times;</button>
+            </div>
+            <p id="supersedeConfirmMessage" style="color:#176d8a; margin:0 0 16px 0;">You are making modification on released spool, are you sure to supersede the previous reports?</p>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" onclick="cancelSupersede()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmSupersede()">Supersede</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:none">@antiForgery</div>
+
+    <script>
+        // Initialization data passed from server
+        const antiforgeryInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        const antiforgeryToken = antiforgeryInput ? antiforgeryInput.value : '';
+
+        const uc = window.uc = {
+          token: antiforgeryToken,
+          endpoints: {
+            exists: '@Url.Action("GetDailyFitupExists", "Home")',
+            complete: '@Url.Action("CompleteDailyFitup", "Home")',
+            confirm: '@Url.Action("ConfirmDailyFitup", "Home")',
+            mail: '@Url.Action("SendDailyFitupEmail", "Home")'
+          },
+          headerView: '@headerView',
+          getProjectId() { return document.getElementById('projectSelect')?.value; },
+          getLocation() { return document.getElementById('locationSelect')?.value; },
+          getFitupIso() { return document.getElementById('fitupDateInput')?.value; },
+          mapHeaderLocation(raw) {
+            const s = (raw || '').trim().toUpperCase();
+            if (s === 'ALL') return 'ALL';
+            if (s.startsWith('WS') || s.startsWith('SHOP') || s.startsWith('WORK')) return 'WS';
+            if (s.startsWith('FW') || s.startsWith('FIELD')) return 'FW';
+            if (s.startsWith('THREAD')) return 'TH';
+            return s;
+          },
+          getAllLocationCodes() { return ['WS','FW','TH']; }
+        };
+
+        (function initUcHelpers() {
+            const defaultState = { updatedExists: false, confirmedExists: false };
+
+            const safeStatus = (message, ok) => {
+                if (!message) return;
+                try {
+                    if (typeof window.showStatus === 'function') {
+                        window.showStatus(message, ok);
+                    } else if (ok) {
+                        console.log(message);
+                    } else {
+                        console.warn(message);
+                    }
+                } catch { /* ignore */ }
+            };
+
+            const normalizeState = (raw) => ({
+                updatedExists: !!(raw && raw.updatedExists),
+                confirmedExists: !!(raw && raw.confirmedExists)
+            });
+
+            const buildTooltip = (breakdown, key) => {
+                if (!breakdown) return '';
+                const parts = [];
+                Object.keys(breakdown).forEach(code => {
+                    const section = breakdown[code] || defaultState;
+                    parts.push(`${code}: ${section[key] ? 'Yes' : 'No'}`);
+                });
+                return parts.join(' | ');
+            };
+
+            uc.checkExists = async function () {
+                const endpoint = this.endpoints.exists;
+                const projectId = this.getProjectId();
+                const fitupIso = this.getFitupIso();
+                const headerLoc = (this.getLocation() || '').trim();
+                const headerLocLower = headerLoc.toLowerCase();
+                const mappedHeaderLoc = this.mapHeaderLocation(headerLoc);
+
+                if (!endpoint || !projectId || !fitupIso) {
+                    if (headerLocLower === 'all') {
+                        const breakdown = {};
+                        this.getAllLocationCodes().forEach(code => { breakdown[code] = { ...defaultState }; });
+                        return { ...defaultState, breakdown };
+                    }
+                    return { ...defaultState };
+                }
+
+                const fetchState = async (locOverride) => {
+                    const locationParam = locOverride ?? mappedHeaderLoc;
+                    if (!locationParam) return { ...defaultState };
+                    const params = new URLSearchParams({
+                        projectId: String(projectId),
+                        location: locationParam,
+                        fitupDateIso: fitupIso
+                    });
+                    try {
+                        const res = await fetch(`${endpoint}?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
+                        if (!res.ok) return { ...defaultState };
+                        const data = await res.json();
+                        return normalizeState(data);
+                    } catch {
+                        return { ...defaultState };
+                    }
+                };
+
+                if (headerLocLower === 'all') {
+                    const codes = this.getAllLocationCodes();
+                    const breakdown = {};
+                    const aggregate = { ...defaultState, breakdown };
+                    await Promise.all(codes.map(async code => {
+                        const state = await fetchState(code);
+                        breakdown[code] = state;
+                        if (state.updatedExists) aggregate.updatedExists = true;
+                        if (state.confirmedExists) aggregate.confirmedExists = true;
+                    }));
+                    return aggregate;
+                }
+
+                return fetchState();
+            };
+
+            uc.setButtonsText = function (state) {
+                const normalized = normalizeState(state);
+                const location = (this.getLocation() || '').trim().toLowerCase();
+                const applyTooltip = (btn, key) => {
+                    if (!btn) return;
+                    if (location === 'all' && state && state.breakdown) {
+                        btn.title = buildTooltip(state.breakdown, key);
+                    } else {
+                        btn.title = '';
+                    }
+                };
+
+                const completeBtn = document.getElementById('completeBtn');
+                if (completeBtn) {
+                    completeBtn.textContent = normalized.updatedExists ? 'Update Daily Fit-up' : 'Daily Fit-up Completed';
+                    applyTooltip(completeBtn, 'updatedExists');
+                }
+
+                const confirmBtn = document.getElementById('confirmBtn');
+                if (confirmBtn) {
+                    const isDateView = (this.headerView || '').trim().toLowerCase() === 'date';
+                    confirmBtn.style.display = isDateView ? 'inline-block' : 'none';
+                    confirmBtn.textContent = normalized.confirmedExists ? 'Update confirmed Fit-up' : 'Daily Fit-up Confirmed';
+                    applyTooltip(confirmBtn, 'confirmedExists');
+                }
+            };
+
+            uc.post = async function (endpoint, actionType) {
+                const projectId = this.getProjectId();
+                const fitupIso = this.getFitupIso();
+                const locRaw = this.getLocation() || '';
+                if (!endpoint) { safeStatus('Endpoint unavailable. Reload the page.', false); return; }
+                if (!projectId) { safeStatus('Select Project first.', false); return; }
+                if (!fitupIso) { safeStatus('Select Fit-up Date first.', false); return; }
+                if (!this.token) { safeStatus('Missing security token. Reload the page.', false); return; }
+
+                const locCode = this.mapHeaderLocation(locRaw);
+                const isAll = locCode === 'ALL';
+                const targetLocs = locCode ? (isAll ? ['ALL'] : [locCode]) : [];
+                if (targetLocs.length === 0) {
+                    safeStatus('Select Location first.', false);
+                    return;
+                }
+
+                const targetBtn = actionType === 'confirmed' ? document.getElementById('confirmBtn') : document.getElementById('completeBtn');
+                const originalText = targetBtn?.textContent || '';
+
+                try {
+                    if (targetBtn) {
+                        targetBtn.disabled = true;
+                        targetBtn.dataset.prevText = originalText;
+                        targetBtn.textContent = 'Working...';
+                    }
+
+                    let okCount = 0;
+                    let failCount = 0;
+
+                    for (const loc of targetLocs) {
+                        const params = new URLSearchParams({
+                            projectId: String(projectId),
+                            location: String(loc),
+                            fitupDateIso: String(fitupIso),
+                            actionType: actionType || 'completed'
+                        });
+
+                        try {
+                            const res = await fetch(endpoint, {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                    'RequestVerificationToken': this.token
+                                },
+                                body: params.toString()
+                            });
+                            if (res.ok) okCount++; else failCount++;
+                        } catch {
+                            failCount++;
+                        }
+                    }
+
+                    if (okCount > 0) {
+                        const scopeLabel = isAll ? 'All locations' : `${okCount} location${okCount > 1 ? 's' : ''}`;
+                        safeStatus(`Done (${scopeLabel})`, true);
+                        try {
+                            const st = await this.checkExists();
+                            this.setButtonsText(st);
+                        } catch { /* ignore */ }
+                        const kind = actionType === 'confirmed' ? 'confirmed' : 'completed';
+                        const label = originalText || (kind === 'confirmed' ? 'Daily Fit-up Confirmed' : 'Daily Fit-up Completed');
+                        await this.sendMail(kind, label);
+                    } else if (failCount > 0) {
+                        safeStatus('Operation failed.', false);
+                    }
+                } catch (err) {
+                    console.error('uc.post failed', err);
+                    safeStatus('Request failed.', false);
+                } finally {
+                    if (targetBtn) {
+                        targetBtn.disabled = false;
+                        if (targetBtn.dataset.prevText) {
+                            targetBtn.textContent = targetBtn.dataset.prevText;
+                            delete targetBtn.dataset.prevText;
+                        }
+                    }
+                }
+            };
+
+            uc.sendMail = async function (kind, label) {
+                try {
+                    const endpoint = this.endpoints.mail;
+                    if (!endpoint || !this.token) return;
+                    const projectId = this.getProjectId();
+                    const fitupIso = this.getFitupIso();
+                    const locRaw = this.getLocation() || '';
+                    if (!projectId || !fitupIso) return;
+
+                    const postMail = async (locCode) => {
+                        if (!locCode) return;
+                        const form = new URLSearchParams({
+                            projectId: String(projectId),
+                            location: String(locCode),
+                            fitupDateIso: String(fitupIso),
+                            actionLabel: String(label || ''),
+                            kind: String(kind || '')
+                        });
+                        try {
+                            const res = await fetch(endpoint, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                                    'RequestVerificationToken': this.token
+                                },
+                                body: form.toString()
+                            });
+                            if (!res.ok) {
+                                try { console.warn('Email send failed', locCode, await res.text()); } catch { /* ignore */ }
+                            }
+                        } catch (err) {
+                            console.warn('Email send error', locCode, err);
+                        }
+                    };
+
+                    if ((locRaw || '').trim().toUpperCase() === 'ALL') {
+                        await postMail('ALL');
+                        return;
+                    }
+
+                    const mapped = this.mapHeaderLocation(locRaw);
+                    if (mapped) await postMail(mapped);
+                } catch (err) {
+                    console.warn('Email send error', err);
+                }
+            };
+        })();
+
+         </script>
+
+         <script id="fitupServerData" type="application/json">
+             @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
+                 lineMaterial = Model?.LineMaterial ?? string.Empty,
+                 locationOptions = sortedLocationOptions,
+                 jAddOptions = jAddOptionsOrdered,
+                 weldTypeOptions = Model?.WeldTypeOptions ?? new List<string>(),
+                 defaultWeldType = (defaultWeldTypeList?.Count > 0 ? defaultWeldTypeList[0] : string.Empty) ?? string.Empty,
+                 materialDescriptions = sortedMaterialDescriptions ?? new List<string>(),
+                 materialGrades = sortedMaterialGrades ?? new List<string>(),
+                 lsRev = Model?.LsRev ?? string.Empty,
+                 defaultWeldTypes = defaultWeldTypeList ?? new List<string>(),
+                 dailyFitupPwht = Model?.PwhtYN,
+                 lineClass = Model?.LineClass ?? string.Empty
+             }))
+         </script>
+
+         <script>
+              const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+             const _sd = JSON.parse(document.getElementById('fitupServerData').textContent);
+             const lineMaterial = _sd.lineMaterial;
+             const locationOptions = _sd.locationOptions;
+             const jAddOptions = _sd.jAddOptions;
+             const weldTypeOptions = _sd.weldTypeOptions;
+             const defaultWeldType = _sd.defaultWeldType;
+             const materialDescriptions = _sd.materialDescriptions;
+             const materialGrades = _sd.materialGrades;
+             const lsRev = _sd.lsRev;
+             const rfiOptionsEndpoint = '@Url.Action("GetRfiOptions", "Home")';
+             window.openLatestDwgUrl = '@Url.Action("OpenLatestDrawing", "Home")';
+             window.downloadLatestDwgUrl = '@Url.Action("DownloadLatestDrawing", "Home")';
+             window.downloadZipUrl = '@Url.Action("DownloadLatestDrawingsZip", "Home")';
+             const wpsEndpointBase = '@Url.Action("GetWpsCandidates", "Home")';
+             const heatEndpoint = '@Url.Action("GetHeatNumbers", "Home")';
+             const defaultWeldTypes = _sd.defaultWeldTypes;
+             window.headerView = '@headerView';
+             window.dailyFitupPwht = _sd.dailyFitupPwht;
+             const lineClassValue = _sd.lineClass;
+             const dailyFitupConfig = {
+                 endpoints: {
+                     rfiDateTime: '@Url.Action("GetRfiDateTime", "Home")',
+                     sheetsForLayout: '@Url.Action("GetSheetsForLayout", "Home")',
+                     addRow: '@Url.Action("AddDfrRow", "Home")',
+                     deleteRow: '@Url.Action("DeleteDfrRow", "Home")',
+                     bulkUpdate: '@Url.Action("BulkUpdateDfrRows", "Home")',
+                     scheduleThickness: '@Url.Action("GetScheduleThickness", "Home")',
+                     schedulesForDiameter: '@Url.Action("GetSchedulesForDiameter", "Home")'
+                 },
+                 lineClass: lineClassValue
+             };
+             window.dailyFitupConfig = dailyFitupConfig;
+
+         </script>
+
+    @{
+        var qrDefaultsObj = new {
+            shop = Model?.FitupReportShop ?? string.Empty,
+            field = Model?.FitupReportField ?? string.Empty,
+            threaded = Model?.FitupReportThreaded ?? string.Empty,
+            combined = string.IsNullOrWhiteSpace(string.Join(" / ", new[] { Model?.FitupReportShop ?? string.Empty, Model?.FitupReportField ?? string.Empty, Model?.FitupReportThreaded ?? string.Empty }.Where(x => !string.IsNullOrWhiteSpace(x)))) ? string.Empty : string.Join(" / ", new[] { Model?.FitupReportShop ?? string.Empty, Model?.FitupReportField ?? string.Empty, Model?.FitupReportThreaded ?? string.Empty }.Where(x => !string.IsNullOrWhiteSpace(x))),
+            single = Model?.FitupReportHeader ?? string.Empty,
+            modelShop = Model?.FitupReportShop ?? string.Empty,
+            modelField = Model?.FitupReportField ?? string.Empty,
+            modelThreaded = Model?.FitupReportThreaded ?? string.Empty,
+            modelCombined = string.IsNullOrWhiteSpace(string.Join(" / ", new[] { Model?.FitupReportShop ?? string.Empty, Model?.FitupReportField ?? string.Empty, Model?.FitupReportThreaded ?? string.Empty }.Where(x => !string.IsNullOrWhiteSpace(x)))) ? string.Empty : string.Join(" / ", new[] { Model?.FitupReportShop ?? string.Empty, Model?.FitupReportField ?? string.Empty, Model?.FitupReportThreaded ?? string.Empty }.Where(x => !string.IsNullOrWhiteSpace(x))),
+            modelHeader = Model?.FitupReportHeader ?? string.Empty
+        };
+    }
+    <script id="qrDefaultsData" type="application/json">
+        @Html.Raw(System.Text.Json.JsonSerializer.Serialize(qrDefaultsObj))
+    </script>
+
+    <script>
+        // --- Header RFI / Report sync and RFI options rebuilding (adapted from DailyWelding) ---
+        (function(){
+            try {
+                const form = document.getElementById('filterForm');
+                const hv = document.getElementById('headerViewSelect');
+                const proj = document.querySelector('select[name="projectId"]');
+                const loc = document.getElementById('locationSelect');
+                const rfiSel = document.getElementById('rfiSelect');
+                const repCombined = document.getElementById('fitupReportCombinedInput');
+                const repSingle = document.getElementById('fitupReportHeaderInput');
+                const reportLabel = document.getElementById('fitupReportLabel');
+
+                const qrDefaults = JSON.parse(document.getElementById('qrDefaultsData').textContent);
+
+                // Cache original full RFI options for rebuilding
+                const originalRfiOptions = rfiSel ? Array.from(rfiSel.options).map(o=>({ value: o.value, text: o.text })) : null;
+
+                function rebuildRfiOptions(prefixes){
+                    if(!rfiSel || !originalRfiOptions) return;
+                    if(!prefixes){
+                        rfiSel.innerHTML = '';
+                        originalRfiOptions.forEach(item => {
+                            const opt = document.createElement('option'); opt.value = item.value; opt.text = item.text; rfiSel.appendChild(opt);
+                        });
+                        return;
+                    }
+                    const prefs = Array.isArray(prefixes) ? prefixes : [prefixes];
+                    let ordered = [];
+                    prefs.forEach(p => {
+                        originalRfiOptions.forEach(o => {
+                            if((o.text||'').startsWith(p) && !ordered.some(x=> x.value===o.value)) ordered.push(o);
+                        });
+                    });
+                    if(ordered.length===0){
+                        prefs.forEach(p=>{
+                            const lower = p.toLowerCase();
+                            originalRfiOptions.forEach(o=>{
+                                if((o.text||'').toLowerCase().startsWith(lower) && !ordered.some(x=> x.value===o.value)) ordered.push(o);
+                            });
+                        });
+                    }
+                    if(ordered.length===0){ originalRfiOptions.forEach(o=>{ if(!ordered.some(x=> x.value===o.value)) ordered.push(o); }); }
+
+                    // Try to extract dates and sort desc
+                    function extractDateFromText(txt){
+                        if(!txt) return null;
+                        const isoMatch = txt.match(/(\d{4}-\d{2}-\d{2})/);
+                        if(isoMatch){ const d = new Date(isoMatch[1]); if(!isNaN(d)) return d; }
+                        const dmyMatch = txt.match(/(\b\d{1,2}-[A-Za-z]{3}-\d{4}\b)/);
+                        if(dmyMatch){ try{ const parts = dmyMatch[1].split('-'); const day = parseInt(parts[0],10); const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(parts[1].substr(0,3)); const year = parseInt(parts[2],10); if(mon>=0){ const dt = new Date(year, mon, day); if(!isNaN(dt)) return dt; } }catch{} }
+                        const slashMatch = txt.match(/(\b\d{1,2}[\/\.]\d{1,2}[\/]\d{4}\b)/);
+                        if(slashMatch){ try{ const s = slashMatch[1].replace(/\./g,'/'); const parts = s.split('/'); const day = parseInt(parts[0],10); const month = parseInt(parts[1],10)-1; const year = parseInt(parts[2],10); return new Date(year, month, day); }catch(e){} }
+                        return null;
+                    }
+
+                    const mapped = ordered.map(o=>({ v:o, d: extractDateFromText(o.text) }));
+                    if(mapped.some(m=> m.d)){ mapped.sort((a,b)=>{ if(a.d && b.d) return b.d - a.d; if(a.d) return -1; if(b.d) return 1; return 0; }); ordered = mapped.map(m=>m.v); }
+
+                    const cur = rfiSel.value || '';
+                    rfiSel.innerHTML = '';
+                    ordered.forEach(item => { const opt = document.createElement('option'); opt.value = item.value; opt.text = item.text; rfiSel.appendChild(opt); });
+                    if(cur){ const found = Array.from(rfiSel.options).some(o=> o.value===cur); if(found) rfiSel.value = cur; }
+                }
+
+                // Utilities
+                function toTrimmed(val){ if(val === null || val === undefined) return ''; return String(val).trim(); }
+                function pickFirstNonEmpty(values){ for(let i=0;i<values.length;i++){ const candidate = toTrimmed(values[i]); if(candidate) return candidate; } return ''; }
+                function normalizeLocation(value){ const raw = toTrimmed(value).toLowerCase(); if(raw === 'shop') return 'Shop'; if(raw === 'field') return 'Field'; if(raw === 'threaded') return 'Threaded'; if(raw === 'all' || !raw) return 'All'; return raw.charAt(0).toUpperCase() + raw.slice(1); }
+
+                const fallbackSingleValue = pickFirstNonEmpty([repSingle ? repSingle.value : '', qrDefaults.single, qrDefaults.modelHeader]);
+                let fallbackCombinedValue = pickFirstNonEmpty([repCombined ? repCombined.value : '', qrDefaults.combined, qrDefaults.modelCombined]);
+                if(!fallbackCombinedValue){ fallbackCombinedValue = [qrDefaults.shop, qrDefaults.field, qrDefaults.threaded].map(x=>toTrimmed(x)).filter(Boolean).join(' / ') || fallbackSingleValue; }
+
+                const headerCache = {};
+                let currentLocationKey = normalizeLocation(loc ? loc.value : 'All');
+                headerCache.All = repCombined ? repCombined.value || fallbackCombinedValue : fallbackCombinedValue;
+                if(repSingle && currentLocationKey !== 'All'){
+                    headerCache[currentLocationKey] = repSingle.value || fallbackSingleValue;
+                }
+
+                const rfiCache = {};
+                if(rfiSel){ rfiCache[currentLocationKey] = rfiSel.value || ''; }
+
+                function getHeaderDefault(key){
+                    switch(key){
+                        case 'Shop': return pickFirstNonEmpty([qrDefaults.shop, qrDefaults.modelShop, fallbackSingleValue]);
+                        case 'Field': return pickFirstNonEmpty([qrDefaults.field, qrDefaults.modelField, fallbackSingleValue]);
+                        case 'Threaded': return pickFirstNonEmpty([qrDefaults.threaded, qrDefaults.modelThreaded, fallbackSingleValue]);
+                        case 'All': default: return pickFirstNonEmpty([fallbackCombinedValue, fallbackSingleValue]);
+                    }
+                }
+
+                function rememberHeaderValue(key){ if(!key) return; if(key === 'All' && repCombined){ headerCache.All = repCombined.value || ''; } else if(key !== 'All' && repSingle){ headerCache[key] = repSingle.value || ''; } }
+                function rememberRfiValue(key){ if(!rfiSel || !key) return; rfiCache[key] = rfiSel.value || ''; }
+
+                function applyRfiForLocation(key){ if(!rfiSel) return; const before = rfiSel.value; const prefixMap = { Shop: ['WS | '], Field: ['FW | '], Threaded: ['FW | '] };
+                    rebuildRfiOptions(prefixMap[key] || null);
+                    let nextValue;
+                    if(Object.prototype.hasOwnProperty.call(rfiCache, key)) nextValue = rfiCache[key];
+                    if(nextValue && !Array.from(rfiSel.options).some(o => o.value === nextValue)) nextValue = '';
+                    if((nextValue === undefined || nextValue === '') && rfiSel.options.length){ nextValue = rfiSel.options[0].value; }
+                    if(nextValue !== undefined){ rfiSel.value = nextValue; rfiCache[key] = rfiSel.value || ''; } else { rfiSel.value = ''; rfiCache[key] = ''; }
+                    if(rfiSel.value !== before){ try{ rfiSel.dispatchEvent(new Event('change',{ bubbles:true })); }catch(e){} }
+                }
+
+                function applyHeaderUi(key){ const locKey = key || 'All'; const isAll = locKey === 'All'; if(reportLabel){ reportLabel.textContent = isAll ? 'Fit-up Report (WS/FW/TH)' : 'Fit-up Report'; reportLabel.setAttribute('for', isAll ? 'fitupReportCombinedInput' : 'fitupReportHeaderInput'); }
+                    if(repCombined){ repCombined.style.display = isAll ? '' : 'none'; repCombined.disabled = !isAll; if(isAll){ const hasCached = Object.prototype.hasOwnProperty.call(headerCache, 'All'); const val = hasCached ? headerCache.All : getHeaderDefault('All'); headerCache.All = val; repCombined.value = val || ''; } }
+                    if(repSingle){ repSingle.style.display = isAll ? 'none' : ''; repSingle.disabled = isAll; if(!isAll){ const hasCached = Object.prototype.hasOwnProperty.call(headerCache, locKey); const val = hasCached ? headerCache[locKey] : getHeaderDefault(locKey); headerCache[locKey] = val; repSingle.value = val || ''; } }
+                    applyRfiForLocation(locKey);
+                }
+
+                applyHeaderUi(currentLocationKey);
+
+                if(loc){ loc.addEventListener('change', function(){ const nextKey = normalizeLocation(loc.value); rememberHeaderValue(currentLocationKey); rememberRfiValue(currentLocationKey); currentLocationKey = nextKey; applyHeaderUi(currentLocationKey); }); }
+                if(repCombined){ repCombined.addEventListener('input', function(){ headerCache.All = repCombined.value || ''; }); }
+                if(repSingle){ repSingle.addEventListener('input', function(){ if(currentLocationKey !== 'All'){ headerCache[currentLocationKey] = repSingle.value || ''; } }); }
+                if(rfiSel){ rfiSel.addEventListener('change', function(){ rfiCache[currentLocationKey] = rfiSel.value || ''; }); }
+
+            } catch (e) { console.debug('Header RFI sync init failed', e); }
+        })();
+    </script>
+
+    <script src="~/js/dailyfitup-dwg.js" asp-append-version="true" defer></script>
+    <script src="~/js/dailyfitup.js" asp-append-version="true" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof window.__dailyfitupDwgInit === 'function') {
+                window.__dailyfitupDwgInit(window.openLatestDwgUrl, window.downloadLatestDwgUrl, window.downloadZipUrl, window.headerView);
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,595 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model List<PMS.Models.HydrotestFlagRow>
+@{
+    Layout = "_LayoutDashboard";
+    ViewData["Title"] = "Hydrotest Flag";
+
+    var projectNos = ViewBag.ProjectNos as List<PMS.Models.ProjectOption> ?? new();
+    var layoutNos = ViewBag.LayoutNos as List<string> ?? new();
+    var sheetNos = ViewBag.SheetNos as List<string> ?? new();
+    var weldNumbers = ViewBag.WeldNumbers as List<string> ?? new();
+    var selectedProjectIds = new HashSet<int>(ViewBag.SelectedProjectIds as List<int> ?? new());
+    var selLayoutNos = new HashSet<string>(ViewBag.SelectedLayoutNos as List<string> ?? new());
+    var selSheetNos = new HashSet<string>(ViewBag.SelectedSheetNos as List<string> ?? new());
+    var selWeldNumbers = new HashSet<string>(ViewBag.SelectedWeldNumbers as List<string> ?? new());
+
+    bool hasFilter = selectedProjectIds.Count > 0
+        || selLayoutNos.Count > 0
+        || selSheetNos.Count > 0
+        || selWeldNumbers.Count > 0;
+
+    bool showSheet = selSheetNos.Count > 0;
+    bool showWeld = selWeldNumbers.Count > 0;
+
+    var msg = TempData["Msg"] as string;
+}
+
+@section Head {
+<style>
+    h1 { color:#176d8a; font-size:1.4rem; line-height:1.2; margin:0 0 20px 0; font-weight:700; letter-spacing:.2px; }
+    .ht-layout { width:98%; margin:14px auto 0; padding:14px 14px 0; box-sizing:border-box; max-width:1800px; }
+
+    /* Filter panel */
+    .filter-panel { background:#fff; border:1px solid #cce7ef; border-radius:8px; padding:14px 18px; margin-bottom:14px; }
+    .filter-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+    .filter-group { display:flex; flex-direction:column; gap:3px; }
+    .filter-group label { font-size:.8rem; color:#176d8a; font-weight:600; }
+    .filter-group select,
+    .filter-group input[type="text"] {
+        font-family:inherit; font-size:.88rem; color:#176d8a; background:#fff;
+        border:1px solid #cce7ef; border-radius:4px; padding:5px 8px; min-width:130px;
+        transition:border-color .2s;
+    }
+    .filter-group select:focus,
+    .filter-group input[type="text"]:focus { border-color:#176d8a; outline:none; box-shadow:0 0 0 2px rgba(23,109,138,.12); }
+
+    /* Buttons */
+    .btn { padding:7px 14px; border:none; border-radius:5px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:5px; line-height:1; font-size:.88rem; transition:background .2s, color .2s, box-shadow .2s; }
+    a.btn, a.btn:link, a.btn:visited, a.btn:hover, a.btn:focus, a.btn:active { text-decoration:none; }
+    .btn-primary { background:#176d8a; color:#fff; }
+    .btn-primary:hover { background:#125a6e; box-shadow:0 2px 6px rgba(23,109,138,.25); }
+    .btn-outline { background:#fff; color:#176d8a; border:1px solid #1f99be; }
+    .btn-outline:hover { background:#1f99be; color:#fff; }
+    .btn-danger { background:#c0392b; color:#fff; }
+    .btn-danger:hover { background:#a93226; }
+    .btn-success { background:#27ae60; color:#fff; }
+    .btn-success:hover { background:#1e8449; box-shadow:0 2px 6px rgba(39,174,96,.25); }
+
+    /* Table */
+    .table-wrap { overflow:auto; -webkit-overflow-scrolling:touch; max-width:100%; max-height:520px; margin:0; background:#fff; border:1px solid #e6f6fa; border-radius:6px; }
+    .table-wrap::-webkit-scrollbar { height:14px; width:14px; }
+    .table-wrap::-webkit-scrollbar-track { background:#f0fbff; }
+    .table-wrap::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; border:3px solid #fff; }
+    .table-wrap::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+    .table-wrap { scrollbar-width:thin; scrollbar-color:#176d8a #f0fbff; }
+    table { width:100%; border-collapse:collapse; background:#fff; table-layout:fixed; margin:0; }
+    th, td { padding:5px 8px; border:1px solid #e6f6fa; font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
+    th { background:#f0fbff; text-align:center; position:sticky; top:0; z-index:3; color:#176d8a; font-weight:700; }
+    tbody tr:nth-child(even) { background:#f8fcff; }
+    tbody tr:hover { background:#eaf5f9; }
+    .col-serial { width:45px; text-align:center; font-weight:600; }
+    .col-readonly { background:#f7fbfc; color:#444; }
+
+    /* Inline inputs */
+    td input[type="text"] {
+        width:100%; box-sizing:border-box; border:1px solid #e6f6fa; border-radius:3px;
+        padding:3px 5px; font-size:.82rem; color:#176d8a; background:#fff; font-family:inherit;
+        transition:border-color .2s; text-align:center;
+    }
+    td input:focus { border-color:#176d8a; outline:none; box-shadow:0 0 0 2px rgba(23,109,138,.1); }
+
+    /* Toolbar */
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .row-count { color:#176d8a; font-weight:600; font-size:.88rem; margin-left:auto; }
+
+    /* Message */
+    .msg-bar { padding:10px 16px; border-radius:6px; background:#e6f6fa; color:#176d8a; font-weight:600; margin-bottom:12px; border-left:4px solid #176d8a; }
+
+    /* Bulk fill panel */
+    .bulk-panel { background:#fff; border:1px solid #e6d9b8; border-radius:8px; padding:14px 18px; margin-bottom:14px; display:none; }
+    .bulk-panel.show { display:block; }
+    .bulk-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:8px; }
+    .bulk-group { display:flex; flex-direction:column; gap:3px; }
+    .bulk-group label { font-size:.78rem; color:#176d8a; font-weight:600; }
+    .bulk-group input { font-family:inherit; font-size:.85rem; color:#176d8a; background:#fff; border:1px solid #cce7ef; border-radius:4px; padding:4px 7px; min-width:90px; }
+
+    /* Upload panel */
+    .upload-panel { background:#fff; border:1px solid #e6d9b8; border-radius:8px; padding:14px 18px; margin-bottom:14px; display:none; }
+    .upload-panel.show { display:block; }
+
+    .section-title { color:#176d8a; font-weight:700; font-size:.95rem; margin-bottom:8px; }
+
+    /* Save bar */
+    .save-bar { margin-top:12px; padding:10px 0; display:flex; justify-content:flex-end; gap:10px; align-items:center; }
+
+    /* Multi-select dropdown */
+    .ms-wrap { position:relative; display:inline-block; vertical-align:middle; min-width:160px; }
+    .ms-wrap-wide { min-width:350px; }
+    .ms-toggle { width:100%; box-sizing:border-box; cursor:pointer; padding:5px 8px; border:1px solid #cce7ef; border-radius:4px; color:#176d8a; font-size:.88rem; font-weight:600; font-family:inherit; background:#fff; display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:30px; }
+    .ms-toggle::after { content:'\25BC'; font-size:.65rem; color:#176d8a; flex-shrink:0; }
+    .ms-open .ms-toggle::after { content:'\25B2'; }
+    .ms-open .ms-toggle { border-radius:4px 4px 0 0; border-color:#176d8a; }
+    .ms-panel { display:none; position:absolute; left:0; right:0; top:100%; z-index:1200; background:#fff; border:1px solid #176d8a; border-top:none; border-radius:0 0 6px 6px; max-height:260px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,.12); scrollbar-width:thin; scrollbar-color:#176d8a #f0fbff; }
+    .ms-panel::-webkit-scrollbar { width:10px; }
+    .ms-panel::-webkit-scrollbar-track { background:#f0fbff; border-radius:8px; }
+    .ms-panel::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; }
+    .ms-panel::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+    .ms-search { width:100%; box-sizing:border-box; padding:6px 10px; border:none; border-bottom:1px solid #e6f6fa; font-size:.85rem; color:#176d8a; outline:none; font-family:inherit; }
+    .ms-actions { display:flex; gap:4px; padding:4px 8px; border-bottom:1px solid #e6f6fa; }
+    .ms-actions button { font-size:.75rem; padding:2px 8px; border-radius:4px; border:1px solid #cce7ef; background:#f0fbff; color:#176d8a; cursor:pointer; font-weight:600; }
+    .ms-actions button:hover { background:#1f99be; color:#fff; border-color:#1f99be; }
+    .ms-option { display:flex; align-items:center; gap:6px; padding:5px 10px; cursor:pointer; font-size:.85rem; color:#176d8a; }
+    .ms-option:hover { background:#e6f6fa; }
+    .ms-option input[type="checkbox"] { accent-color:#1f99be; cursor:pointer; }
+    .ms-option.ms-hidden { display:none; }
+    .ms-no-match { padding:6px 10px; font-size:.85rem; color:#999; font-style:italic; }
+
+    @@media (max-width:900px) {
+        .filter-row { flex-direction:column; align-items:stretch; }
+        .filter-group select, .filter-group input[type="text"] { min-width:100%; }
+        .ms-wrap, .ms-wrap-wide { min-width:100%; }
+        .toolbar { flex-direction:column; align-items:flex-start; }
+        .row-count { margin-left:0; }
+        th, td { font-size:.78rem; padding:4px 5px; }
+        .bulk-row { flex-direction:column; align-items:stretch; }
+    }
+</style>
+}
+
+<div class="ht-layout">
+    <h1>Hydrotest Flag</h1>
+
+    @if (!string.IsNullOrWhiteSpace(msg))
+    {
+        <div class="msg-bar">@msg</div>
+    }
+
+    <!-- ── FILTER PANEL ────────────────────────────── -->
+    <div class="filter-panel">
+        <form method="get" asp-action="HydrotestFlag" asp-controller="Home" id="htFilterForm">
+            <div class="filter-row">
+                <!-- Project No -->
+                <div class="filter-group">
+                    <label>Project No</label>
+                    <div class="ms-wrap ms-wrap-wide" id="msProject" data-ms-placeholder="Select projects...">
+                        <div class="ms-toggle" tabindex="0">
+                            <span class="ms-label">Select projects...</span>
+                        </div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search projects..." />
+                            <div class="ms-actions">
+                                <button type="button" data-action="all">All</button>
+                                <button type="button" data-action="none">None</button>
+                            </div>
+                            <div class="ms-options">
+                                @foreach (var p in projectNos)
+                                {
+                                    var isChecked = selectedProjectIds.Contains(p.Id);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="projectNo" value="@p.Id" @(isChecked ? "checked" : "") />
+                                        @p.Id - @p.Name
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layout No (cascading from Project) -->
+                <div class="filter-group">
+                    <label>Layout No</label>
+                    <div class="ms-wrap" id="msLayout" data-ms-placeholder="Select layout...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select layout...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in layoutNos)
+                                {
+                                    var isChecked = selLayoutNos.Contains(v);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="layoutNo" value="@v" @(isChecked ? "checked" : "") />
+                                        @v
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sheet No (cascading from Project + Layout) -->
+                <div class="filter-group">
+                    <label>Sheet No</label>
+                    <div class="ms-wrap" id="msSheet" data-ms-placeholder="Select sheet...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select sheet...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in sheetNos)
+                                {
+                                    var isChecked = selSheetNos.Contains(v);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="sheetNo" value="@v" @(isChecked ? "checked" : "") />
+                                        @v
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weld Number (cascading from Project + Layout + Sheet) -->
+                <div class="filter-group">
+                    <label>Weld Number</label>
+                    <div class="ms-wrap" id="msWeld" data-ms-placeholder="Select weld...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select weld...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in weldNumbers)
+                                {
+                                    var isChecked = selWeldNumbers.Contains(v);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="weldNumber" value="@v" @(isChecked ? "checked" : "") />
+                                        @v
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="filter-group" style="justify-content:flex-end;">
+                    <button type="submit" class="btn btn-primary">🔍 Filter</button>
+                </div>
+                @if (hasFilter)
+                {
+                    <div class="filter-group" style="justify-content:flex-end;">
+                        <a asp-action="HydrotestFlag" asp-controller="Home" class="btn btn-outline">✖ Clear</a>
+                    </div>
+                }
+            </div>
+        </form>
+    </div>
+
+    @if (hasFilter && Model.Count > 0)
+    {
+        <!-- ── TOOLBAR ──────────────────────────────── -->
+        <div class="toolbar">
+            <button type="button" class="btn btn-outline" onclick="togglePanel('bulkPanel')">&#9998; Bulk Fill</button>
+            <button type="button" class="btn btn-outline" onclick="togglePanel('uploadPanel')">&#8682; Upload Excel</button>
+            @{
+                var exportParams = new List<string>();
+                foreach (var id in selectedProjectIds) { exportParams.Add("projectNo=" + id); }
+                foreach (var v in selLayoutNos) { exportParams.Add("layoutNo=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selSheetNos) { exportParams.Add("sheetNo=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selWeldNumbers) { exportParams.Add("weldNumber=" + Uri.EscapeDataString(v)); }
+            }
+            <a class="btn btn-outline"
+               href="/Home/ExportHydrotestFlag?@(string.Join("&", exportParams))">
+                &#8615; Export Excel
+            </a>
+            <span class="row-count">@Model.Count row(s)</span>
+        </div>
+
+        <!-- ── BULK FILL PANEL ──────────────────────── -->
+        <div id="bulkPanel" class="bulk-panel">
+            <div class="section-title">Bulk Fill — apply values to all @Model.Count filtered rows (only non-empty fields are applied)</div>
+            <form method="post" asp-action="BulkFillHydrotestFlag" asp-controller="Home">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="bulkIds" value="@string.Join(",", Model.Select(r => r.LineId).Distinct())" />
+                <input type="hidden" name="bulkJointIds" value="@(showWeld ? string.Join(",", Model.Where(r => r.JointId.HasValue).Select(r => r.JointId!.Value).Distinct()) : "")" />
+                <div class="bulk-row">
+                    <div class="bulk-group"><label>System</label><input type="text" name="bfSystem" /></div>
+                    <div class="bulk-group"><label>Sub System</label><input type="text" name="bfSubSystem" /></div>
+                    <div class="bulk-group"><label>Test Package No</label><input type="text" name="bfTestPackageNo" /></div>
+                    <div class="bulk-group"><label>Test Type</label><input type="text" name="bfTestType" /></div>
+                    <div class="bulk-group"><label>Spool No</label><input type="text" name="bfSpoolNo" /></div>
+                    <div class="bulk-group"><label>P&amp;ID</label><input type="text" name="bfPId" /></div>
+                    <div class="bulk-group"><label>Test Package No WS</label><input type="text" name="bfTestPackageNoWs" /></div>
+                    <div class="bulk-group" style="justify-content:flex-end;">
+                        <button type="submit" class="btn btn-success">✅ Apply Bulk</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- ── UPLOAD EXCEL PANEL ───────────────────── -->
+        <div id="uploadPanel" class="upload-panel">
+            <div class="section-title">Upload Excel — update rows by Line ID (and Joint ID for DFR)</div>
+            <form method="post" asp-action="ImportHydrotestFlag" asp-controller="Home" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" style="font-size:.88rem;" />
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ── DATA TABLE (inline edit) ─────────────── -->
+        <form method="post" asp-action="SaveHydrotestFlag" asp-controller="Home">
+            @Html.AntiForgeryToken()
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-serial">#</th>
+                            <th style="width:180px;">Project No</th>
+                            <th style="width:100px;">Layout No</th>
+                            @if (showSheet)
+                            {
+                                <th style="width:80px;">Sheet No</th>
+                            }
+                            @if (showWeld)
+                            {
+                                <th style="width:130px;">Weld No</th>
+                            }
+                            <th style="width:80px;">System</th>
+                            <th style="width:100px;">Sub System</th>
+                            <th style="width:140px;">Test Package No</th>
+                            <th style="width:90px;">Test Type</th>
+                            <th style="width:80px;">Spool No</th>
+                            <th style="width:100px;">P&amp;ID</th>
+                            <th style="width:140px;">Test Package No WS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.Count; i++)
+                        {
+                            var row = Model[i];
+                            <tr>
+                                <td class="col-serial">@(i + 1)</td>
+                                <td class="col-readonly" title="@row.ProjectNo">@row.ProjectNo</td>
+                                <td class="col-readonly">@row.LayoutNo</td>
+                                @if (showSheet)
+                                {
+                                    <td class="col-readonly">@row.SheetNo</td>
+                                }
+                                @if (showWeld)
+                                {
+                                    <td class="col-readonly">@row.WeldNo</td>
+                                }
+                                <td>
+                                    <input type="hidden" name="ids" value="@row.LineId" />
+                                    <input type="hidden" name="jointIds" value="@(showWeld ? (row.JointId ?? 0) : 0)" />
+                                    <input type="text" name="systemVals" value="@row.System" />
+                                </td>
+                                <td><input type="text" name="subSystemVals" value="@row.SubSystem" /></td>
+                                <td><input type="text" name="testPackageNoVals" value="@row.TestPackageNo" /></td>
+                                <td><input type="text" name="testTypeVals" value="@row.TestType" /></td>
+                                <td><input type="text" name="spoolNoVals" value="@row.SpoolNo" /></td>
+                                <td><input type="text" name="pIdVals" value="@row.PId" /></td>
+                                <td><input type="text" name="testPackageNoWsVals" value="@row.TestPackageNoWs" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.Count > 0)
+            {
+                <div class="save-bar">
+                    <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                </div>
+            }
+        </form>
+    }
+    else if (hasFilter)
+    {
+        <div class="msg-bar">No rows match the current filter.</div>
+
+        <div class="toolbar">
+            <button type="button" class="btn btn-outline" onclick="togglePanel('uploadPanelEmpty')">&#8682; Upload Excel</button>
+        </div>
+        <div id="uploadPanelEmpty" class="upload-panel">
+            <div class="section-title">Upload Excel — update rows by Line ID (and Joint ID for DFR)</div>
+            <form method="post" asp-action="ImportHydrotestFlag" asp-controller="Home" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" style="font-size:.88rem;" />
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    }
+    else
+    {
+        <div class="msg-bar">Select at least one filter and click <strong>Filter</strong> to load rows, or upload an Excel file to update directly.</div>
+
+        <div class="toolbar">
+            <button type="button" class="btn btn-outline" onclick="togglePanel('uploadPanelInit')">&#8682; Upload Excel</button>
+        </div>
+        <div id="uploadPanelInit" class="upload-panel">
+            <div class="section-title">Upload Excel — update rows by Line ID (and Joint ID for DFR)</div>
+            <form method="post" asp-action="ImportHydrotestFlag" asp-controller="Home" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" style="font-size:.88rem;" />
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+    // ── Toggle panels ────────────────────────────────────────
+    function togglePanel(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('show');
+    }
+
+    // ── Multi-select dropdown behaviour ──────────────────────
+    function initMs(wrap) {
+        var toggle = wrap.querySelector('.ms-toggle');
+        var panel = wrap.querySelector('.ms-panel');
+        var search = wrap.querySelector('.ms-search');
+        var placeholder = wrap.dataset.msPlaceholder || 'Select...';
+        var labelSpan = toggle.querySelector('.ms-label');
+
+        function updateLabel() {
+            var checked = wrap.querySelectorAll('.ms-option input:checked');
+            if (checked.length === 0) { labelSpan.textContent = placeholder; }
+            else if (checked.length === 1) { labelSpan.textContent = checked[0].parentElement.textContent.trim(); }
+            else { labelSpan.textContent = checked.length + ' selected'; }
+        }
+
+        // Only bind static handlers once to prevent duplicates on re-init
+        if (!wrap.dataset.msInit) {
+            wrap.dataset.msInit = '1';
+
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var wasOpen = wrap.classList.contains('ms-open');
+                closeAllMs();
+                if (!wasOpen) { wrap.classList.add('ms-open'); panel.style.display = 'block'; if (search) search.focus(); }
+            });
+
+            if (search) {
+                search.addEventListener('input', function () {
+                    var q = search.value.toLowerCase();
+                    var any = false;
+                    // Re-query each time so dynamically rebuilt options are found
+                    wrap.querySelectorAll('.ms-option').forEach(function (opt) {
+                        var match = opt.textContent.toLowerCase().indexOf(q) >= 0;
+                        opt.classList.toggle('ms-hidden', !match);
+                        if (match) any = true;
+                    });
+                    var nm = wrap.querySelector('.ms-no-match');
+                    if (nm) nm.style.display = any ? 'none' : 'block';
+                });
+            }
+
+            wrap.querySelectorAll('.ms-actions button').forEach(function (b) {
+                b.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var action = b.dataset.action;
+                    // Re-query for dynamic options
+                    wrap.querySelectorAll('.ms-option').forEach(function (opt) {
+                        if (!opt.classList.contains('ms-hidden')) {
+                            opt.querySelector('input').checked = (action === 'all');
+                        }
+                    });
+                    updateLabel();
+                });
+            });
+
+            // Event delegation on .ms-options container – works for dynamically rebuilt checkboxes
+            var optionsContainer = wrap.querySelector('.ms-options');
+            if (optionsContainer) {
+                optionsContainer.addEventListener('change', function () {
+                    updateLabel();
+                });
+            }
+        }
+
+        // Always refresh the label text (needed after rebuildOptions)
+        updateLabel();
+    }
+
+    function closeAllMs() {
+        document.querySelectorAll('.ms-wrap').forEach(function (w) {
+            w.classList.remove('ms-open');
+            var p = w.querySelector('.ms-panel');
+            if (p) p.style.display = 'none';
+        });
+    }
+    document.addEventListener('click', closeAllMs);
+    document.querySelectorAll('.ms-wrap').forEach(initMs);
+
+    // ── Cascading: Project → Layout → Sheet → Weld ─────────
+    (function () {
+        var msProject = document.getElementById('msProject');
+        var msLayout = document.getElementById('msLayout');
+        var msSheet = document.getElementById('msSheet');
+        var msWeld = document.getElementById('msWeld');
+        if (!msProject || !msLayout || !msSheet || !msWeld) return;
+
+        function getCheckedValues(wrap, name) {
+            var vals = [];
+            wrap.querySelectorAll('.ms-option input[name="' + name + '"]:checked').forEach(function (cb) {
+                vals.push(cb.value);
+            });
+            return vals;
+        }
+
+        function rebuildOptions(wrap, name, items, keepSelected) {
+            var container = wrap.querySelector('.ms-options');
+            var search = wrap.querySelector('.ms-search');
+            // Clear any active search text so all new options are visible
+            if (search) search.value = '';
+            container.innerHTML = '';
+            items.forEach(function (val) {
+                var lbl = document.createElement('label');
+                lbl.className = 'ms-option';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.name = name; cb.value = val;
+                if (keepSelected && keepSelected.indexOf(val) >= 0) cb.checked = true;
+                lbl.appendChild(cb);
+                lbl.appendChild(document.createTextNode(' ' + val));
+                container.appendChild(lbl);
+            });
+            // Safe to re-call – static handlers are guarded by data-ms-init
+            initMs(wrap);
+        }
+
+        function buildQs(pids, lnos, snos) {
+            var parts = [];
+            (pids || []).forEach(function (v) { parts.push('projectNo=' + encodeURIComponent(v)); });
+            (lnos || []).forEach(function (v) { parts.push('layoutNo=' + encodeURIComponent(v)); });
+            (snos || []).forEach(function (v) { parts.push('sheetNo=' + encodeURIComponent(v)); });
+            return parts.join('&');
+        }
+
+        function refreshLayouts() {
+            var pids = getCheckedValues(msProject, 'projectNo');
+            fetch('/Home/GetHtLayoutNos?' + buildQs(pids))
+                .then(function (r) { return r.json(); })
+                .then(function (items) {
+                    var sel = getCheckedValues(msLayout, 'layoutNo');
+                    rebuildOptions(msLayout, 'layoutNo', items, sel);
+                    refreshSheets();
+                });
+        }
+
+        function refreshSheets() {
+            var pids = getCheckedValues(msProject, 'projectNo');
+            var lnos = getCheckedValues(msLayout, 'layoutNo');
+            fetch('/Home/GetHtSheetNos?' + buildQs(pids, lnos))
+                .then(function (r) { return r.json(); })
+                .then(function (items) {
+                    var sel = getCheckedValues(msSheet, 'sheetNo');
+                    rebuildOptions(msSheet, 'sheetNo', items, sel);
+                    refreshWelds();
+                });
+        }
+
+        function refreshWelds() {
+            var pids = getCheckedValues(msProject, 'projectNo');
+            var lnos = getCheckedValues(msLayout, 'layoutNo');
+            var snos = getCheckedValues(msSheet, 'sheetNo');
+            fetch('/Home/GetHtWeldNumbers?' + buildQs(pids, lnos, snos))
+                .then(function (r) { return r.json(); })
+                .then(function (items) {
+                    var sel = getCheckedValues(msWeld, 'weldNumber');
+                    rebuildOptions(msWeld, 'weldNumber', items, sel);
+                });
+        }
+
+        // Listen for checkbox changes in each cascading dropdown
+        msProject.addEventListener('change', function (e) {
+            if (e.target.name === 'projectNo') refreshLayouts();
+        });
+        msLayout.addEventListener('change', function (e) {
+            if (e.target.name === 'layoutNo') refreshSheets();
+        });
+        msSheet.addEventListener('change', function (e) {
+            if (e.target.name === 'sheetNo') refreshWelds();
+        });
+    })();
+</script>
+}

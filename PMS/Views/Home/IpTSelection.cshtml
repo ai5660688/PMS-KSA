@@ -1,0 +1,867 @@
+@model PMS.Models.IpTSelectionViewModel
+@using System.Text.Json
+@{
+    Layout = null;
+    var weldTypeOptionsJson = JsonSerializer.Serialize(Model.WeldTypeOptions ?? new List<string>());
+    var selectedWeldTypesJson = JsonSerializer.Serialize(Model.SelectedWeldTypes ?? new List<string>());
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>PMS - Tracer Selection</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/IpTSelection.css" asp-append-version="true" />
+</head>
+<body>
+    @await Html.PartialAsync("~/Views/Shared/_DashboardHeader.cshtml")
+    <div class="ipt-container">
+        <div class="ipt-card">
+            <header class="ipt-page-header">
+                <div class="ipt-heading">
+                    <p class="ipt-eyebrow">Inspection Tracking</p>
+                    <h1>Tracer Selection</h1>
+                    Manage Inspection Point and Tracer assignments for joints.
+                </div>
+                <div class="ipt-primary-actions">
+                    <a href="/Home/RtSelection" class="btn btn-outline" style="text-decoration:none;">← RT Selection</a>
+                    <button id="iptApply" type="button" class="btn btn-primary">Apply Filters</button>
+                    <button id="iptReset" type="button" class="btn btn-outline">Reset</button>
+                </div>
+            </header>
+            <div class="ipt-layout">
+                <section class="ipt-main-panel">
+                    <div class="ipt-alert hidden" id="iptMessage" role="status" aria-live="polite"></div>
+                    <div class="ipt-panel-card">
+                        <div class="ipt-panel-header">
+                            <div>
+                                <p class="ipt-panel-eyebrow">Filters</p>
+                                <h2>Selection Criteria</h2>
+                                <p class="ipt-panel-hint">Select project and lot to load joints requiring Tracer assignment.</p>
+                            </div>
+                        </div>
+                        <div class="ipt-filters">
+                            <div class="ipt-filters-row">
+                                <div class="ipt-field-slim">
+                                    <label>Project No</label>
+                                    <div class="ms-wrap ms-wrap-wide" id="iptProjectMs" data-ms-placeholder="Select projects...">
+                                        <div class="ms-toggle" tabindex="0">
+                                            <span class="ms-label">Select projects...</span>
+                                        </div>
+                                        <div class="ms-panel">
+                                            <input type="text" class="ms-search" placeholder="Search projects..." />
+                                            <div class="ms-actions">
+                                                <button type="button" data-action="all">All</button>
+                                                <button type="button" data-action="none">None</button>
+                                            </div>
+                                            <div class="ms-options">
+                                                @foreach (var p in Model.Projects)
+                                                {
+                                                    var isChecked = Model.SelectedProjectIds.Contains(p.Id);
+                                                    <label class="ms-option">
+                                                        <input type="checkbox" name="iptProject" value="@p.Id" @(isChecked ? "checked" : "") />
+                                                        @p.Id - @p.Name
+                                                    </label>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ipt-field-slim ipt-field-radio">
+                                    <span class="ipt-radio-title">Location</span>
+                                    <div class="ipt-radio-group ipt-radio-inline">
+                                        <label><input type="radio" name="iptLocation" value="All" @(Model.Location.Equals("All", StringComparison.OrdinalIgnoreCase) ? "checked" : string.Empty) /> All</label>
+                                        <label><input type="radio" name="iptLocation" value="Shop" @(Model.Location.Equals("Shop", StringComparison.OrdinalIgnoreCase) ? "checked" : string.Empty) /> Shop</label>
+                                        <label><input type="radio" name="iptLocation" value="Field" @(Model.Location.Equals("Field", StringComparison.OrdinalIgnoreCase) ? "checked" : string.Empty) /> Field</label>
+                                    </div>
+                                </div>
+                                <div class="ipt-wt-filter">
+                                    <div class="ipt-filter-header">
+                                        <label>Weld Type</label>
+                                        <div class="ipt-wt-actions">
+                                            <button type="button" id="iptWtAll" class="btn btn-outline">All</button>
+                                            <button type="button" id="iptWtNone" class="btn btn-outline">None</button>
+                                            <button type="button" id="iptWtDefault" class="btn btn-outline">Default</button>
+                                        </div>
+                                    </div>
+                                    <div class="ipt-wt-list" id="iptWeldTypes"></div>
+                                </div>
+                            </div>
+                            <div class="ipt-filters-row">
+                                <div class="ipt-filter-grid-slim">
+                                    <div class="ipt-field-slim">
+                                        <label for="iptLineClass">Line Class</label>
+                                        <input id="iptLineClass" class="ipt-input" type="text" placeholder="Search Line Class" />
+                                    </div>
+                                    <div class="ipt-field-slim">
+                                        <label for="iptLayout">Layout</label>
+                                        <input id="iptLayout" class="ipt-input" type="text" placeholder="Search Layout" />
+                                    </div>
+                                    <div class="ipt-field-slim">
+                                        <label for="iptSheet">Sheet</label>
+                                        <input id="iptSheet" class="ipt-input" type="text" placeholder="Search Sheet" />
+                                    </div>
+                                    <div class="ipt-field-slim">
+                                        <label for="iptJoint">Joint No</label>
+                                        <input id="iptJoint" class="ipt-input" type="text" placeholder="Search Joint No" />
+                                    </div>
+                                    <div class="ipt-field-slim">
+                                        <label for="iptRepairWelder">Repair Welder</label>
+                                        <input id="iptRepairWelder" class="ipt-input" type="text" placeholder="Search Repair Welder" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ipt-match-criteria">
+                                <span class="ipt-criteria-title">Match Criteria (for Tracer updates):</span>
+                                <label><input type="checkbox" id="iptMatchLot" checked /> Lot No.</label>
+                                <label><input type="checkbox" id="iptMatchDate" checked /> Actual Date Welded</label>
+                                <label><input type="checkbox" id="iptMatchDiameter" checked /> Diameter</label>
+                                <label><input type="checkbox" id="iptMatchLineClass" checked /> Line Class</label>
+                                <label><input type="checkbox" id="iptMatchWelder" checked /> Repair Welder</label>
+                                <label><input type="checkbox" id="iptMatchProcess" checked /> Process</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ipt-table-card">
+                        <div class="ipt-card-title">Joints Requiring Tracer Assignment</div>
+                        <div class="ipt-table-wrap">
+                            <table class="ipt-table" id="iptTable">
+                                <thead>
+                                     <tr>
+                                        <th>S/N</th>
+                                        <th class="ipt-center">Layout</th>
+                                        <th class="ipt-center">Sheet</th>
+                                        <th class="ipt-center">Joint No</th>
+                                        <th class="ipt-center">Actual Date</th>
+                                        <th class="ipt-center">Dia. In.</th>
+                                        <th class="ipt-center">Line Class</th>
+                                        <th class="ipt-center">Repair Welder</th>
+                                        <th class="ipt-center">Root</th>
+                                        <th class="ipt-center">Fill/Cap</th>
+                                        <th class="ipt-center">RT Result</th>
+                                        <th class="ipt-center">Current T</th>
+                                        <th class="ipt-center">Update T</th>
+                                        <th class="ipt-center">Status</th>
+                                        <th class="ipt-center">Lot No</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="empty"><td colspan="15">No data — select a project and click Apply Filters.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="ipt-loader hidden" id="iptLoader">Loading...</div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="iptConfirmOverlay" class="rt-modal-overlay hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:9999;display:flex;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;padding:28px 32px;max-width:460px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,0.18);">
+            <h3 id="iptConfirmTitle" style="margin:0 0 12px;font-size:1.1rem;color:var(--ipt-text);">Confirm</h3>
+            <div id="iptConfirmBody" style="font-size:0.9rem;color:var(--ipt-muted);margin-bottom:20px;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button type="button" class="btn btn-outline" id="iptConfirmCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="iptConfirmOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="iptSelectOverlay" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:9998;display:flex;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:14px;padding:28px 32px;max-width:780px;width:95%;box-shadow:0 8px 30px rgba(0,0,0,0.18);max-height:85vh;display:flex;flex-direction:column;">
+            <h3 id="iptSelectTitle" style="margin:0 0 6px;font-size:1.1rem;color:var(--ipt-text);">Update T</h3>
+            <p id="iptSelectSubtitle" style="margin:0 0 14px;font-size:0.82rem;color:var(--ipt-muted);"></p>
+            <div id="iptSelectMatchedSection" class="hidden" style="margin-bottom:16px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;">
+                <p style="margin:0 0 8px;font-size:0.82rem;font-weight:600;color:var(--ipt-text);">Matched Rows (<span id="iptSelectMatchedCount">0</span>):</p>
+                <div id="iptSelectTableWrap" style="flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:auto;border:1px solid var(--ipt-border);border-radius:8px;position:relative;">
+                    <table class="ipt-modal-table" id="iptSelectMatchedTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Layout</th>
+                                <th>Sheet</th>
+                                <th>Joint No</th>
+                                <th>Date</th>
+                                <th>Dia.</th>
+                                <th>Line Class</th>
+                                <th>Root</th>
+                                <th>Fill/Cap</th>
+                                <th>Lot</th>
+                                <th>Requested Date</th>
+                                <th>Update T</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="iptSelectOptions" style="display:none;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button type="button" class="btn btn-outline" id="iptSelectCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="iptSelectApply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const projectMsWrap = document.getElementById('iptProjectMs');
+            function getSelectedProjectIds() {
+                return Array.from((projectMsWrap || document).querySelectorAll('input[name="iptProject"]:checked')).map(cb => Number(cb.value)).filter(v => v > 0);
+            }
+            function getFirstProjectId() {
+                var ids = getSelectedProjectIds(); return ids.length > 0 ? ids[0] : 0;
+            }
+            const loader = document.getElementById('iptLoader');
+            const messageBox = document.getElementById('iptMessage');
+            const lineClassInput = document.getElementById('iptLineClass');
+            const layoutInput = document.getElementById('iptLayout');
+            const sheetInput = document.getElementById('iptSheet');
+            const jointInput = document.getElementById('iptJoint');
+            const repairWelderInput = document.getElementById('iptRepairWelder');
+            const weldTypeContainer = document.getElementById('iptWeldTypes');
+            const iptAllowedWeldTypes = new Set(['BW', 'SW', 'SOF', 'TH']);
+            const weldTypeOptions = JSON.parse('@Html.Raw(weldTypeOptionsJson)').filter(w => iptAllowedWeldTypes.has((w || '').toString().trim().toUpperCase()));
+            const defaultWeldTypes = JSON.parse('@Html.Raw(selectedWeldTypesJson)').filter(w => iptAllowedWeldTypes.has((w || '').toString().trim().toUpperCase()));
+            let messageTimer = null;
+            let loadAbort = null;
+
+            function confirmModal(message, title) {
+                return new Promise(resolve => {
+                    const overlay = document.getElementById('iptConfirmOverlay');
+                    const titleEl = document.getElementById('iptConfirmTitle');
+                    const bodyEl = document.getElementById('iptConfirmBody');
+                    const okBtn = document.getElementById('iptConfirmOk');
+                    const cancelBtn = document.getElementById('iptConfirmCancel');
+                    titleEl.textContent = title || 'Confirm';
+                    bodyEl.innerHTML = message || '';
+                    overlay.classList.remove('hidden');
+                    overlay.style.display = 'flex';
+                    function close(result) {
+                        overlay.classList.add('hidden');
+                        overlay.style.display = 'none';
+                        okBtn.removeEventListener('click', onOk);
+                        cancelBtn.removeEventListener('click', onCancel);
+                        overlay.removeEventListener('click', onOverlay);
+                        resolve(result);
+                    }
+                    function onOk() { close(true); }
+                    function onCancel() { close(false); }
+                    function onOverlay(e) { if (e.target === overlay) close(false); }
+                    okBtn.addEventListener('click', onOk);
+                    cancelBtn.addEventListener('click', onCancel);
+                    overlay.addEventListener('click', onOverlay);
+                });
+            }
+
+            function showMessage(text, type) {
+                if (!messageBox) { alert(text || ''); return; }
+                messageBox.textContent = text || '';
+                messageBox.classList.remove('hidden', 'ipt-alert-info', 'ipt-alert-success', 'ipt-alert-error');
+                const cls = type === 'success' ? 'ipt-alert-success' : (type === 'error' ? 'ipt-alert-error' : 'ipt-alert-info');
+                messageBox.classList.add(cls);
+                if (messageTimer) { clearTimeout(messageTimer); }
+                messageTimer = setTimeout(() => messageBox.classList.add('hidden'), 5000);
+            }
+
+            function escapeHtml(str) {
+                return (str || '').toString()
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function distinctJoin(values) {
+                const seen = new Set();
+                return (values || [])
+                    .filter(v => v != null && String(v).trim() !== '')
+                    .map(v => String(v).trim())
+                    .filter(v => { const k = v.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+                    .join(', ');
+            }
+
+            function toggleLoading(show) {
+                if (!loader) return;
+                if (show) loader.classList.remove('hidden'); else loader.classList.add('hidden');
+            }
+
+            function formatDateDMY(val) {
+                if (!val) return '';
+                try {
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return '';
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const yyyy = d.getFullYear();
+                    return `${dd}-${mm}-${yyyy}`;
+                } catch { return ''; }
+            }
+
+            function ipOrTBadge(value) {
+                if (!value) return '<span class="ipt-current-val ipt-val-null">—</span>';
+                const v = value.trim().toUpperCase();
+                if (v.startsWith('IP')) return `<span class="ipt-current-val ipt-val-ip">${escapeHtml(value)}</span>`;
+                if (v.includes('-') || v.startsWith('FL')) return `<span class="ipt-current-val ipt-val-fl">${escapeHtml(value)}</span>`;
+                return `<span class="ipt-current-val ipt-val-other">${escapeHtml(value)}</span>`;
+            }
+
+            function tracerStatusBadge(status) {
+                if (!status) return '';
+                const s = status.trim();
+                let cls = 'ipt-status-notavail';
+                if (s === '2nd Not Available') cls = 'ipt-status-2ndnotavail';
+                else if (s === 'Pending') cls = 'ipt-status-pending';
+                else if (s === 'Done') cls = 'ipt-status-done';
+                return `<span class="ipt-status-badge ${cls}">${escapeHtml(s)}</span>`;
+            }
+
+            function getMatchCriteria() {
+                return {
+                    matchLot: document.getElementById('iptMatchLot')?.checked ?? true,
+                    matchDate: document.getElementById('iptMatchDate')?.checked ?? true,
+                    matchDiameter: document.getElementById('iptMatchDiameter')?.checked ?? true,
+                    matchLineClass: document.getElementById('iptMatchLineClass')?.checked ?? true,
+                    matchWelder: document.getElementById('iptMatchWelder')?.checked ?? true,
+                    matchProcess: document.getElementById('iptMatchProcess')?.checked ?? true
+                };
+            }
+
+            function selectedLocation() {
+                return document.querySelector('input[name="iptLocation"]:checked')?.value || 'All';
+            }
+
+            function renderWeldTypes(options, defaults) {
+                const list = Array.isArray(options) ? options : [];
+                const def = new Set((defaults || []).map(x => (x || '').toString().trim().toUpperCase()));
+                weldTypeContainer.innerHTML = list.map(w => {
+                    const val = (w || '').toString();
+                    const checked = def.size === 0 || def.has(val.trim().toUpperCase());
+                    const checkedAttr = checked ? ' checked' : '';
+                    return `<label><input type="checkbox" class="ipt-wt" value="${escapeHtml(val)}"${checkedAttr}/> ${escapeHtml(val)}</label>`;
+                }).join('');
+            }
+
+            function selectedWeldTypes() {
+                return Array.from(document.querySelectorAll('.ipt-wt:checked')).map(cb => cb.value);
+            }
+
+            renderWeldTypes(weldTypeOptions, defaultWeldTypes);
+
+            document.getElementById('iptWtAll')?.addEventListener('click', () => {
+                document.querySelectorAll('.ipt-wt').forEach(cb => cb.checked = true);
+            });
+            document.getElementById('iptWtNone')?.addEventListener('click', () => {
+                document.querySelectorAll('.ipt-wt').forEach(cb => cb.checked = false);
+            });
+            document.getElementById('iptWtDefault')?.addEventListener('click', () => {
+                renderWeldTypes(weldTypeOptions, defaultWeldTypes);
+            });
+
+            function renderRows(rows) {
+                const tbody = document.querySelector('#iptTable tbody');
+                if (!tbody) return;
+                if (!rows || rows.length === 0) {
+                    tbody.innerHTML = '<tr class="empty"><td colspan="16">No data</td></tr>';
+                    return;
+                }
+                const frag = document.createDocumentFragment();
+                let lastGroupKey = '';
+                rows.forEach((r, idx) => {
+                    const jointId = r.jointId ?? r.JointId;
+                    const ipOrT = r.ipOrT ?? r.IpOrT;
+                    const repairWelder = r.repairWelder ?? r.RepairWelder ?? '';
+                    const groupKey = repairWelder;
+                    if (groupKey !== lastGroupKey) {
+                        lastGroupKey = groupKey;
+                        const gtr = document.createElement('tr');
+                        gtr.className = 'ipt-group-header';
+                        gtr.innerHTML = `<td colspan="16">Repair Welder: <strong>${escapeHtml(repairWelder || '—')}</strong></td>`;
+                        frag.appendChild(gtr);
+                    }
+                    const tr = document.createElement('tr');
+                    tr.setAttribute('data-joint', jointId);
+                    tr.setAttribute('data-welder', repairWelder);
+                    const loc = (r.location ?? r.Location ?? '').trim();
+                    const weld = (r.weldNumber ?? r.WeldNumber ?? '').trim();
+                    const jAdd = (r.jAdd ?? r.JAdd ?? '').trim();
+                    const baseJointNo = loc && weld ? loc + '-' + weld : (loc || weld);
+                    const jointNo = jAdd && jAdd.toLowerCase() !== 'new' ? baseJointNo + jAdd : baseJointNo;
+                    tr.innerHTML = `<td class="ipt-center">${idx + 1}</td>
+                        <td class="ipt-center">${escapeHtml(r.layoutNumber ?? r.LayoutNumber)}</td>
+                        <td class="ipt-center">${escapeHtml(r.sheet ?? r.Sheet ?? '')}</td>
+                        <td class="ipt-center">${escapeHtml(jointNo)}</td>
+                        <td class="ipt-center">${formatDateDMY(r.actualDateWelded ?? r.ActualDateWelded)}</td>
+                        <td class="ipt-center">${(r.diameter ?? r.Diameter) != null ? Number(r.diameter ?? r.Diameter).toLocaleString() : ''}</td>
+                        <td class="ipt-center">${escapeHtml(r.lineClass ?? r.LineClass)}</td>
+                        <td class="ipt-center">${escapeHtml(repairWelder)}</td>
+                        <td class="ipt-center">${escapeHtml(distinctJoin([r.rootA ?? r.RootA, r.rootB ?? r.RootB]))}</td>
+                        <td class="ipt-center">${escapeHtml(distinctJoin([r.fillA ?? r.FillA, r.fillB ?? r.FillB, r.capA ?? r.CapA, r.capB ?? r.CapB]))}</td>
+                        <td class="ipt-center">${escapeHtml(r.finalRtResult ?? r.FinalRtResult)}</td>
+                        <td class="ipt-center">${ipOrTBadge(ipOrT)}</td>
+                        <td class="ipt-center"><button type="button" class="btn btn-outline ipt-update-btn" data-joint="${jointId}" data-welder="${escapeHtml(repairWelder)}" style="font-size:0.78rem;padding:4px 10px;">Select</button></td>
+                        <td class="ipt-center">${tracerStatusBadge(r.tracerStatus ?? r.TracerStatus)}</td>
+                        <td class="ipt-center">${escapeHtml(r.lotNo ?? r.LotNo)}</td>`;
+                    frag.appendChild(tr);
+                });
+                tbody.innerHTML = '';
+                tbody.appendChild(frag);
+                attachUpdateHandlers();
+            }
+
+            function attachUpdateHandlers() {
+                document.querySelectorAll('.ipt-update-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const jointId = Number(btn.getAttribute('data-joint'));
+                        const welder = btn.getAttribute('data-welder') || '';
+                        const pid = getFirstProjectId();
+                        if (!jointId || !pid) return;
+                        await openDropdown(jointId, pid, welder, btn);
+                    });
+                });
+            }
+
+            function openSelectModal(title, subtitle, options, matchedRows, optionsPerRow) {
+                return new Promise(resolve => {
+                    const overlay = document.getElementById('iptSelectOverlay');
+                    const titleEl = document.getElementById('iptSelectTitle');
+                    const subtitleEl = document.getElementById('iptSelectSubtitle');
+                    const optionsEl = document.getElementById('iptSelectOptions');
+                    const cancelBtn = document.getElementById('iptSelectCancel');
+                    const applyBtn = document.getElementById('iptSelectApply');
+                    const matchedSection = document.getElementById('iptSelectMatchedSection');
+                    const matchedCount = document.getElementById('iptSelectMatchedCount');
+                    const matchedTbody = document.querySelector('#iptSelectMatchedTable tbody');
+
+                    titleEl.textContent = title || 'Update T';
+                    subtitleEl.textContent = subtitle || '';
+                    optionsEl.innerHTML = '';
+                    const perRow = optionsPerRow || {};
+
+                    // -- Searchable dropdown widget for per-row T assignment --
+                    function makeIptSearchable(wrap) {
+                        const input = wrap.querySelector('.ipt-ss-input');
+                        const list = wrap.querySelector('.ipt-ss-list');
+                        if (!input || !list) return;
+                        let items = [];
+                        let highlighted = -1;
+                        let isOpen = false;
+
+                        // Build items from data-options attribute
+                        function buildItems() {
+                            items = JSON.parse(wrap.dataset.options || '[]').map(v => ({ value: v, text: v }));
+                        }
+
+                        function render(filter) {
+                            list.innerHTML = '';
+                            highlighted = -1;
+                            const lc = (filter || '').toLowerCase();
+                            let count = 0;
+                            items.forEach((item, i) => {
+                                if (lc && !(item.text || '').toLowerCase().includes(lc)) return;
+                                const div = document.createElement('div');
+                                div.className = 'ipt-ss-item';
+                                div.textContent = item.text;
+                                div.dataset.idx = String(i);
+                                if (item.value === input.value.trim()) div.classList.add('ipt-ss-active');
+                                div.addEventListener('mousedown', e => { e.preventDefault(); pick(i); });
+                                list.appendChild(div);
+                                count++;
+                            });
+                            if (count === 0) {
+                                const empty = document.createElement('div');
+                                empty.className = 'ipt-ss-empty';
+                                empty.textContent = 'No match';
+                                list.appendChild(empty);
+                            }
+                        }
+
+                        function pick(idx) {
+                            if (idx < 0 || idx >= items.length) return;
+                            input.value = items[idx].value;
+                            closeList();
+                        }
+
+                        function positionList() {
+                            const rect = input.getBoundingClientRect();
+                            list.style.left = rect.left + 'px';
+                            list.style.top = rect.bottom + 'px';
+                            list.style.width = rect.width + 'px';
+                        }
+
+                        function show() {
+                            if (isOpen) return;
+                            isOpen = true;
+                            buildItems();
+                            render(input.value.trim());
+                            positionList();
+                            list.style.display = 'block';
+                            wrap.classList.add('ipt-ss-open');
+                        }
+
+                        function closeList() {
+                            isOpen = false;
+                            list.style.display = 'none';
+                            wrap.classList.remove('ipt-ss-open');
+                            highlighted = -1;
+                        }
+
+                        // Reposition on scroll so the list follows the input
+                        const scrollParent = document.getElementById('iptSelectTableWrap');
+                        if (scrollParent) {
+                            scrollParent.addEventListener('scroll', () => { if (isOpen) positionList(); }, { passive: true });
+                        }
+
+                        function highlightItem(dir) {
+                            const visible = list.querySelectorAll('.ipt-ss-item');
+                            if (!visible.length) return;
+                            if (dir === 'down') highlighted = highlighted < visible.length - 1 ? highlighted + 1 : 0;
+                            else highlighted = highlighted > 0 ? highlighted - 1 : visible.length - 1;
+                            visible.forEach((el, i) => el.classList.toggle('ipt-ss-highlight', i === highlighted));
+                            if (visible[highlighted]) visible[highlighted].scrollIntoView({ block: 'nearest' });
+                        }
+
+                        input.addEventListener('focus', () => { input.select(); show(); });
+                        input.addEventListener('input', () => { show(); render(input.value); });
+                        input.addEventListener('keydown', e => {
+                            if (e.key === 'ArrowDown') { e.preventDefault(); if (!isOpen) { show(); render(''); } highlightItem('down'); }
+                            else if (e.key === 'ArrowUp') { e.preventDefault(); highlightItem('up'); }
+                            else if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (isOpen && highlighted >= 0) {
+                                    const visible = list.querySelectorAll('.ipt-ss-item');
+                                    if (visible[highlighted]) { const idx = parseInt(visible[highlighted].dataset.idx, 10); pick(idx); }
+                                } else { closeList(); }
+                            }
+                            else if (e.key === 'Escape') { closeList(); input.blur(); }
+                            else if (e.key === 'Tab') { closeList(); }
+                        });
+                        input.addEventListener('blur', () => { setTimeout(() => { if (!wrap.contains(document.activeElement)) closeList(); }, 150); });
+                    }
+
+                    // Render matched rows with per-row searchable dropdown
+                    const rows = Array.isArray(matchedRows) ? matchedRows : [];
+                    const opts = Array.isArray(options) ? options : [];
+                    if (rows.length > 0) {
+                        matchedCount.textContent = rows.length;
+                        matchedTbody.innerHTML = '';
+                        rows.forEach((r, idx) => {
+                            const tr = document.createElement('tr');
+                            const display = r.jointNo || '';
+                            const jid = r.jointId ?? r.JointId;
+                            // Use per-row options if available, otherwise fall back to global options
+                            const rowOpts = (perRow[jid] && perRow[jid].length > 0) ? perRow[jid] : opts;
+                            const currentVal = (r.currentIpOrT || '').trim();
+                            tr.innerHTML = `<td>${idx + 1}</td>
+                                <td>${escapeHtml(r.layoutNumber || '')}</td>
+                                <td>${escapeHtml(r.sheet || '')}</td>
+                                <td>${escapeHtml(display)}</td>
+                                <td>${formatDateDMY(r.actualDateWelded)}</td>
+                                <td>${r.diameter != null ? Number(r.diameter).toLocaleString() : ''}</td>
+                                <td>${escapeHtml(r.lineClass || '')}</td>
+                                <td>${escapeHtml(r.root || '')}</td>
+                                <td>${escapeHtml(r.fillCap || '')}</td>
+                                <td>${escapeHtml(r.lotNo || '')}</td>
+                                <td>${formatDateDMY(r.requestedDate)}</td>
+                                <td><div class="ipt-ss-wrap" data-jointid="${jid}" data-options='${JSON.stringify(rowOpts).replace(/'/g, "&#39;")}'><input type="text" class="ipt-ss-input ipt-row-assign" data-jointid="${jid}" value="${escapeHtml(currentVal)}" placeholder="—" maxlength="8" autocomplete="off" /><div class="ipt-ss-list"></div></div></td>`;
+                            matchedTbody.appendChild(tr);
+                        });
+                        // Initialize searchable widgets
+                        matchedTbody.querySelectorAll('.ipt-ss-wrap').forEach(w => makeIptSearchable(w));
+                        matchedSection.classList.remove('hidden');
+                    } else {
+                        matchedSection.classList.add('hidden');
+                    }
+
+                    function close(result) {
+                        overlay.classList.add('hidden');
+                        overlay.style.display = 'none';
+                        cancelBtn.removeEventListener('click', onCancel);
+                        applyBtn.removeEventListener('click', onApply);
+                        overlay.removeEventListener('click', onOverlay);
+                        resolve(result);
+                    }
+                    function onCancel() { close(null); }
+                    function onOverlay(e) { if (e.target === overlay) close(null); }
+                    function onApply() {
+                        const assignments = [];
+                        document.querySelectorAll('.ipt-row-assign').forEach(el => {
+                            const jid = Number(el.getAttribute('data-jointid'));
+                            const val = (el.value || '').trim();
+                            if (jid && val) {
+                                assignments.push({ jointId: jid, ipOrTValue: val });
+                            }
+                        });
+                        if (assignments.length === 0) {
+                            showMessage('Please enter a Tracer value for at least one row.', 'info');
+                            return;
+                        }
+                        close(assignments);
+                    }
+
+                    cancelBtn.addEventListener('click', onCancel);
+                    applyBtn.addEventListener('click', onApply);
+                    overlay.addEventListener('click', onOverlay);
+                    overlay.classList.remove('hidden');
+                    overlay.style.display = 'flex';
+                });
+            }
+
+            async function openDropdown(jointId, projectId, welderSymbol, triggerBtn) {
+                try {
+                    triggerBtn.disabled = true;
+                    triggerBtn.textContent = '...';
+                    const criteria = getMatchCriteria();
+                    const weldTypes = selectedWeldTypes();
+                    const res = await fetch('/Home/GetIpTDropdownOptions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jointId,
+                            projectId,
+                            welderSymbol,
+                            weldTypes,
+                            matchLot: criteria.matchLot,
+                            matchDate: criteria.matchDate,
+                            matchDiameter: criteria.matchDiameter,
+                            matchLineClass: criteria.matchLineClass,
+                            matchWelder: criteria.matchWelder,
+                            matchProcess: criteria.matchProcess
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { showMessage('Failed to load options.', 'error'); return; }
+
+                    const matchedRows = data.matchedRows || [];
+
+                    if (data.flNumbering) {
+                        const prefix = data.flPrefix || 'FL';
+                        const matchCount = (data.matchedRows || []).length;
+                        const countHint = matchCount > 0 ? `<br><span style="font-size:0.85rem;">${matchCount} matching row(s) will be updated.</span>` : '';
+                        const ok = await confirmModal(
+                            `This joint has completed Second Tracer. Apply <b>${escapeHtml(prefix)} numbering</b> (${escapeHtml(prefix)}-01, ${escapeHtml(prefix)}-02, …) to all matching rows?${countHint}<br><small style="color:var(--ipt-muted);">Note: "Actual Date Welded" matching is not applied for Full Lot.</small>`,
+                            'Apply Full Lot Numbering');
+                        if (!ok) return;
+                        await applyUpdate(jointId, projectId, welderSymbol, 'FL_AUTO', { matchDate: false });
+                        return;
+                    }
+
+                    const options = data.options || [];
+                    const optionsPerRow = data.optionsPerRow || {};
+                    if (options.length === 0) {
+                        showMessage('No Tracer options available for this joint.', 'info');
+                        return;
+                    }
+
+                    const selected = await openSelectModal(
+                        'Update T',
+                        `Select a Tracer value for each row.`,
+                        options,
+                        matchedRows,
+                        optionsPerRow
+                    );
+                    if (!selected) return;
+                    // Also update the source repair joint with the first assigned value
+                    if (selected.length > 0 && !selected.some(a => a.jointId === jointId)) {
+                        selected.push({ jointId, ipOrTValue: selected[0].ipOrTValue });
+                    }
+                    await applyBatchUpdate(projectId, selected);
+                } catch (err) {
+                    showMessage('Error loading options: ' + (err.message || ''), 'error');
+                } finally {
+                    triggerBtn.disabled = false;
+                    if (triggerBtn.textContent === '...') triggerBtn.textContent = 'Select';
+                }
+            }
+
+            async function applyUpdate(jointId, projectId, welderSymbol, ipOrTValue, criteriaOverrides) {
+                const criteria = { ...getMatchCriteria(), ...(criteriaOverrides || {}) };
+                const weldTypes = selectedWeldTypes();
+                toggleLoading(true);
+                try {
+                    const res = await fetch('/Home/UpdateIpOrT', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            jointId,
+                            projectId,
+                            welderSymbol,
+                            ipOrTValue,
+                            weldTypes,
+                            matchLot: criteria.matchLot,
+                            matchDate: criteria.matchDate,
+                            matchDiameter: criteria.matchDiameter,
+                            matchLineClass: criteria.matchLineClass,
+                            matchWelder: criteria.matchWelder,
+                            matchProcess: criteria.matchProcess
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showMessage(data?.message || 'Update failed.', 'error');
+                        return;
+                    }
+                    const count = data.updatedCount ?? 0;
+                    showMessage(`Tracer updated for ${count} row(s).`, 'success');
+                    await loadData();
+                } catch (err) {
+                    showMessage('Update failed: ' + (err.message || ''), 'error');
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            async function applyBatchUpdate(projectId, assignments) {
+                toggleLoading(true);
+                try {
+                    const res = await fetch('/Home/BatchUpdateIpOrT', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ projectId, assignments })
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        showMessage(data?.message || 'Update failed.', 'error');
+                        return;
+                    }
+                    const count = data.updatedCount ?? 0;
+                    showMessage(`Tracer updated for ${count} row(s).`, 'success');
+                    await loadData();
+                } catch (err) {
+                    showMessage('Update failed: ' + (err.message || ''), 'error');
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            async function loadData() {
+                if (loadAbort) { loadAbort.abort(); }
+                loadAbort = new AbortController();
+
+                try {
+                    toggleLoading(true);
+                    var ids = getSelectedProjectIds();
+                    const pid = ids.length > 0 ? ids[0] : 0;
+                    const params = new URLSearchParams();
+                    ids.forEach(function(id){ params.append('projectIds', id); });
+                    params.append('projectId', pid);
+                    params.append('location', selectedLocation());
+                    if (lineClassInput?.value) params.append('lineClass', lineClassInput.value);
+                    if (layoutInput?.value) params.append('layout', layoutInput.value);
+                    if (sheetInput?.value) params.append('sheet', sheetInput.value);
+                    if (jointInput?.value) params.append('jointNo', jointInput.value);
+                    if (repairWelderInput?.value) params.append('repairWelder', repairWelderInput.value);
+                    selectedWeldTypes().forEach(w => params.append('weldTypes', w));
+                    const criteria = getMatchCriteria();
+                    params.append('matchLot', criteria.matchLot);
+                    params.append('matchDate', criteria.matchDate);
+                    params.append('matchDiameter', criteria.matchDiameter);
+                    params.append('matchLineClass', criteria.matchLineClass);
+                    params.append('matchWelder', criteria.matchWelder);
+                    params.append('matchProcess', criteria.matchProcess);
+                    const res = await fetch('/Home/GetIpTSelectionData?' + params.toString(), { signal: loadAbort.signal });
+                    const data = await res.json();
+                    renderRows(data?.rows || []);
+                } catch (err) {
+                    if (err?.name === 'AbortError') return;
+                    renderRows([]);
+                } finally {
+                    toggleLoading(false);
+                }
+            }
+
+            if (projectMsWrap) {
+                var optsCont = projectMsWrap.querySelector('.ms-options');
+                if (optsCont) optsCont.addEventListener('change', () => loadData());
+                projectMsWrap.querySelectorAll('.ms-actions button').forEach(function(b){
+                    b.addEventListener('click', function(){ setTimeout(loadData, 0); });
+                });
+            }
+
+            document.getElementById('iptApply')?.addEventListener('click', () => loadData());
+            document.getElementById('iptReset')?.addEventListener('click', () => {
+                document.getElementById('iptMatchLot').checked = true;
+                document.getElementById('iptMatchDate').checked = true;
+                document.getElementById('iptMatchDiameter').checked = true;
+                document.getElementById('iptMatchLineClass').checked = true;
+                document.getElementById('iptMatchWelder').checked = true;
+                document.getElementById('iptMatchProcess').checked = true;
+                const allRadio = document.querySelector('input[name="iptLocation"][value="All"]');
+                if (allRadio) allRadio.checked = true;
+                if (lineClassInput) lineClassInput.value = '';
+                if (layoutInput) layoutInput.value = '';
+                if (sheetInput) sheetInput.value = '';
+                if (jointInput) jointInput.value = '';
+                if (repairWelderInput) repairWelderInput.value = '';
+                renderWeldTypes(weldTypeOptions, defaultWeldTypes);
+                loadData();
+            });
+
+            // ── Multi-select dropdown behaviour ──────────────────────
+            function initMs(wrap) {
+                var toggle = wrap.querySelector('.ms-toggle');
+                var panel = wrap.querySelector('.ms-panel');
+                var search = wrap.querySelector('.ms-search');
+                var placeholder = wrap.dataset.msPlaceholder || 'Select...';
+                var labelSpan = toggle.querySelector('.ms-label');
+                function updateLabel() {
+                    var checked = wrap.querySelectorAll('.ms-option input:checked');
+                    if (checked.length === 0) { labelSpan.textContent = placeholder; }
+                    else if (checked.length === 1) { labelSpan.textContent = checked[0].parentElement.textContent.trim(); }
+                    else { labelSpan.textContent = checked.length + ' selected'; }
+                }
+                if (!wrap.dataset.msInit) {
+                    wrap.dataset.msInit = '1';
+                    toggle.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        var wasOpen = wrap.classList.contains('ms-open');
+                        closeAllMs();
+                        if (!wasOpen) { wrap.classList.add('ms-open'); panel.style.display = 'block'; if (search) search.focus(); }
+                    });
+                    if (search) {
+                        search.addEventListener('input', function () {
+                            var q = search.value.toLowerCase();
+                            wrap.querySelectorAll('.ms-option').forEach(function (opt) {
+                                var match = opt.textContent.toLowerCase().indexOf(q) >= 0;
+                                opt.classList.toggle('ms-hidden', !match);
+                            });
+                        });
+                    }
+                    wrap.querySelectorAll('.ms-actions button').forEach(function (b) {
+                        b.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            var action = b.dataset.action;
+                            wrap.querySelectorAll('.ms-option').forEach(function (opt) {
+                                if (!opt.classList.contains('ms-hidden')) {
+                                    opt.querySelector('input').checked = (action === 'all');
+                                }
+                            });
+                            updateLabel();
+                        });
+                    });
+                    var optionsContainer = wrap.querySelector('.ms-options');
+                    if (optionsContainer) {
+                        optionsContainer.addEventListener('change', function () { updateLabel(); });
+                    }
+                }
+                updateLabel();
+            }
+            function closeAllMs() {
+                document.querySelectorAll('.ms-wrap').forEach(function (w) {
+                    w.classList.remove('ms-open');
+                    var p = w.querySelector('.ms-panel');
+                    if (p) p.style.display = 'none';
+                });
+            }
+            document.addEventListener('click', closeAllMs);
+            document.querySelectorAll('.ms-wrap').forEach(initMs);
+
+            loadData();
+        })();
+    </script>
+</body>
+</html>

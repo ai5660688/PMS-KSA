@@ -1,0 +1,360 @@
+﻿/* Strong, specific selectors (no :root, no !important) */
+#passwordMismatch,
+.signup-container .confirm-password .password-match-error,
+.signup-container p.error-text {
+    color: #ED1E4D;
+}
+
+/* Enforce same color for all signup errors (regular, no :root, no !important) */
+.signup-container .error-text,
+.signup-container .password-match-error,
+.signup-container .validation-summary-errors,
+.signup-container .field-validation-error,
+.signup-container .text-danger {
+    color: #ED1E4D;
+}
+
+/* Keep existing layout/behavior for the mismatch message */
+.password-match-error {
+    font-size: 0.9em;
+    display: none;   /* JS toggles to block */
+    width: 100%;
+    order: 2;
+    margin-top: 6px;
+    margin-bottom: 0; /* reduce extra space under message */
+    text-decoration: underline;
+    font-style: italic;
+    font-weight: bold;
+}
+
+body {
+    font-family: Calibri, Arial, Helvetica, sans-serif;
+    background-color: #fff8eb;
+    margin: 0;
+    padding: 0;
+    color: rgb(26, 109, 134);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+h1 {
+    color: #1f99be;
+    text-align: left;
+    font-size: 2.2em;
+    font-weight: bold;
+    margin: 18px 0 18px 18px;
+    flex-shrink: 0;
+}
+
+.main-logo {
+    height: 1.2em;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+/* Main Content */
+.container-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex: 1;
+    width: 100%;
+    padding: 40px 0 100px;
+    box-sizing: border-box;
+}
+
+.signup-container {
+    max-width: 760px;
+    width: 90%;
+    margin: 0 auto;
+    box-sizing: border-box;
+    background: #faf2e3;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+    border: 1px solid #e6d9bc;
+}
+
+.signup-container h2 {
+    text-align: center;
+    color: #176d8a;
+    margin-bottom: 25px;
+    font-size: 2.0em;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.signup-container form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 540px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.form-group {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    position: relative;
+    flex-wrap: wrap; /* Allow error to wrap to a new line within the group */
+}
+
+.form-group label {
+    flex: 0 0 130px;
+    text-align: left;
+    margin-right: 15px;
+    color: #176d8a;
+    font-weight: bold;
+    margin-bottom: 0;
+    font-size: 1.05em;
+}
+
+.form-group input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+    padding: 9px 11px;
+    border: 1.5px solid #176d8a;
+    color: #176d8a;
+    text-align: left;
+    box-sizing: border-box;
+    border-radius: 5px;
+    font-size: 1em;
+    background: #fff;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.form-group input:focus {
+    border-color: #1f99be;
+    box-shadow: 0 0 8px rgba(31, 153, 190, 0.3);
+    outline: none;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+button[type="submit"] {
+    width: 200px;
+    min-width: 200px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    box-sizing: border-box;
+    font-size: 1.1em;
+    padding: 11px 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s, transform 0.2s;
+    background-color: #1f99be;
+    color: #fff;
+    border: none;
+    box-shadow: 0 3px 8px rgba(31, 153, 190, 0.25);
+}
+
+button[type="submit"]:hover {
+    background-color: #176d8a;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px rgba(31, 153, 190, 0.35);
+}
+
+button[type="submit"]:active {
+    transform: translateY(0);
+}
+
+/* Error text (e.g., "Username already exists") should match login error color */
+.error-text {
+    color: #ED1E4D; /* match "Invalid username or password" */
+    font-size: 0.9em;
+    text-decoration: underline;
+    font-style: italic;
+    font-weight: bold;
+    text-align: center;
+    margin: 8px 0 16px 0;
+}
+
+/* Success stays green */
+.alert-success {
+    color: #3c763d;
+    font-size: 0.9em;
+    text-decoration: underline;
+    font-style: italic;
+    font-weight: bold;
+    text-align: center;
+    margin: 8px 0 16px 0;
+}
+
+/* Reduce space below the confirm-password group when error is visible */
+.form-group.confirm-password.has-error {
+    margin-bottom: 8px; /* was 28px */
+}
+
+/* Reserve space so layout doesn't jump when the message appears */
+.form-group.confirm-password { margin-bottom: 28px; }
+/* Message styling */
+.message {
+    padding: 10px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.message.success {
+    background-color: #dff0d8;
+    color: #3c763d;
+    border: 1px solid #d6e9c6;
+}
+
+.message.error {
+    background-color: #f2dede;
+    color: #a94442;
+    border: 1px solid #ebccd1;
+}
+
+/* Password rules list under the password field */
+.password-rules {
+    width: 100%;
+    order: 2;
+    margin: 6px 0 0 0;
+    padding-left: 18px;
+    font-size: 0.92em;
+    color: #6b7280; /* neutral for unmet rules */
+}
+.password-rules li { list-style: disc; }
+.password-rules li.valid { color: #3c763d; font-weight: bold; }
+.password-rules li.invalid { color: #a94442; }
+
+/* Back to Login Link */
+.back-to-login-container {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 18px;
+    border-top: 1px dashed #c4b99b;
+}
+
+.back-to-login-link {
+    color: #1f99be;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.05em;
+    transition: color 0.2s;
+}
+
+.back-to-login-link:hover {
+    color: #176d8a;
+    text-decoration: underline;
+}
+
+/* Fixed Footer Styling */
+.footer {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #faf2e3;
+    padding: 12px 15px 12px 15px;
+    border-top: 1.5px solid #1f99be;
+    font-size: 0.95em;
+    color: #176d8a;
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.footer-left,
+.footer-right {
+    flex: 0 0 auto;
+}
+
+.footer-center {
+    flex: 0 0 auto;
+    text-align: center;
+    margin: 0 auto;
+}
+
+.footer-logo {
+    height: 80px;
+    width: auto;
+    border-radius: 6px;
+    border: 1.5px solid #1f99be;
+    position: absolute;
+    right: 15px;
+    bottom: 8px;
+    z-index: 1002;
+    background-color: #faf2e3;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .footer {
+        flex-direction: column;
+        text-align: center;
+        padding: 12px;
+        min-height: auto;
+    }
+    .footer-center, .footer-right { width: 100%; }
+    .footer-logo { position: relative; right: auto; bottom: auto; margin: 8px auto; height: 60px; }
+}
+
+@media (max-width: 600px) {
+    .signup-container form { max-width: 100%; }
+    .form-group { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .form-group label { flex: 0 0 auto; width: 100%; margin-bottom: 0; }
+    .form-group input { width: 100%; }
+    /* On small screens, show message under the input without left indent */
+    .password-match-error { position: static; margin-left: 0; }
+}
+
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.3em;
+        margin: 8px 0 8px 8px;
+    }
+
+    .container-wrapper {
+        padding: 20px 0 80px;
+    }
+
+    .signup-container h2 {
+        font-size: 1.6em;
+    }
+
+    button[type="submit"] {
+        width: 100%;
+        min-width: auto;
+        font-size: 1em;
+    }
+
+    .footer {
+        position: fixed;
+        flex-direction: column;
+        padding: 10px;
+    }
+
+    .footer-left {
+        display: none;
+    }
+
+    .footer-center {
+        font-size: 0.9em;
+    }
+
+    .footer-logo {
+        height: 55px;
+    }
+}

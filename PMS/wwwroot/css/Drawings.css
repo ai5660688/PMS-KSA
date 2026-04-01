@@ -1,0 +1,146 @@
+/* Match Project Log styles */
+.page { width:90%; margin:20px auto; background:#fff; border-radius:8px; box-shadow: 0 4px 12px rgba(0,0,0,.1); padding:20px; }
+.page-title { color:#176d8a; font-size:2em; margin: 0 0 16px 0; padding-bottom:10px; border-bottom:2px solid #e6f6fa; }
+/* Buttons: unify with site look */
+.btn { padding:6px 12px; border:1px solid #176d8a; border-radius:6px; cursor:pointer; font-weight:600; transition: background .18s, box-shadow .18s, transform .02s; display:inline-flex; align-items:center; justify-content:center; line-height:1; font-size:.95rem; text-decoration:none; min-height:32px; min-width:110px; }
+.btn:hover { box-shadow: 0 2px 4px rgba(0,0,0,.12); }
+.btn:focus-visible { outline:2px solid rgba(31,153,190,.35); outline-offset:1px; }
+.btn[disabled], .btn:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; }
+.btn-primary { background:#1f99be; color:#fff; border-color:#176d8a; }
+.btn-primary:hover{ background:#176d8a; }
+.btn-danger { background:#cc0000; color:#fff; border-color:#a30000; }
+.btn-danger:hover{ background:#a30000; }
+.btn-secondary { background:#7a9aa8; color:#fff; border-color:#5e7f8d; }
+.btn-outline { background:#fff; color:#176d8a; border:1px solid #1f99be; }
+.btn-outline:hover { background:#1f99be; color:#fff; border-color:#176d8a; }
+.user-table { width:100%; border-collapse:collapse; margin-top:20px; }
+#revisionsBlock h3 { margin-bottom:4px; }
+#revisionsBlock .user-table { margin-top:6px; }
+.user-table th { background-color:#e6f6fa; color:#176d8a; padding:10px 12px; text-align:left; position:sticky; top:0; }
+.user-table td { padding:10px 12px; border-bottom:1px solid #e6f6fa; color:#1a6d86; }
+.user-table th, .user-table td { font-size:.9rem; white-space: nowrap; }
+.rev-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.rev-actions form { display:inline; margin:0; }
+.btn-move { min-width:24px !important; min-height:24px; padding:6px; font-size:12px; border-radius:4px; }
+.file-name { margin-left:10px; color:#176d8a; font-weight:600; }
+input[type="file"] { display:none; }
+/* Inputs like Project Log */
+label { font-weight:600; color:#176d8a; font-size:.9rem; }
+.form-control { padding:8px 12px; border:1px solid #cce7ef; border-radius:4px; background:#fff; color:#176d8a; font-size:.9rem; box-sizing:border-box; }
+.form-control:focus { outline:none; border-color:#1f99be; box-shadow: 0 0 2px rgba(31,153,190,.2); }
+
+/* Drawings filter strip */
+.fitup-header.no-frame{ border:none !important; background:transparent !important; box-shadow:none !important; border-radius:0 !important; padding:0 !important; margin: 0 0 10px 0 !important; }
+.fitup-header.no-frame .row{ display:flex; flex-wrap:wrap; gap: 10px 14px; margin-bottom:0 !important; align-items:center; }
+.fitup-header.no-frame label{ margin-right:6px; font-size:.95rem; }
+.fitup-header.no-frame .form-control{ padding: 6px 10px; }
+
+/* Uploaded By cell and Latest tag */
+.uploaded-by { font-style: italic; font-weight:700; text-decoration: underline; }
+.rev-latest { margin-left:6px; font-style: italic; font-weight:700; text-decoration: underline; color:#176d8a; }
+
+/* Upload section */
+.revtag-label { font-size:.95rem; }
+.revtag-input.form-control { padding: 6px 10px; }
+
+/* Increase table header height */
+.user-table thead th { padding: 14px 12px; }
+
+/* Tighter action buttons */
+.btn-action { min-width:70px; height:32px; padding: 0 12px; font-size:.85rem; }
+/* Slightly narrower for the revision action buttons (Open, Download, Edit, Del) and fix height to match */
+.rev-actions .btn-action { min-width:56px; height:32px; padding: 0 10px; }
+/* Ensure Delete is a tad narrower too */
+.rev-actions .btn-del { min-width:40px; padding:6px; }
+
+/* Smaller Delete button */
+.btn-del { min-width:44px; padding: 4px 6px; font-size:.78rem; }
+
+/* Small inline Rev input */
+.rev-inline { width:90px; display:inline-block; vertical-align:middle; padding: 4px 8px; }
+
+/* Modal styles */
+.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+.modal-content { background:#fff; padding: 18px 20px 20px; border-radius:8px; width:420px; max-width:90%; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.modal-header { display:flex; align-items:center; justify-content:space-between; margin: 0 0 8px 0; }
+.modal-title { font-size:1.15rem; margin:0; color:#176d8a; }
+.close-modal { background:none; border:none; font-size:1.4rem; line-height:1; cursor:pointer; padding: 4px; color:#555; }
+.close-modal:hover { color:#000; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+
+/* Edit modal */
+#editDrawingModal .modal-content { max-width:720px; width:95%; padding:25px; }
+#editFileName { width:50%; min-width:0; }
+.form-group { margin-bottom:12px; }
+
+/* Inline status for Rev save */
+.inline-msg { margin-left:8px; font-weight:600; color:#0a7c53; }
+.inline-msg.error { color:#c62828; }
+
+/* Edit Drawing title spacing */
+#editDrawingModal .modal-header { margin: 0 0 10px 0; padding-bottom:8px; border-bottom:1px solid #e6f6fa; }
+#editDrawingModal .modal-title { margin:0; }
+
+/* Confirm Delete modal: add outer margin and internal sections padded */
+#confirmDeleteModal .modal-content { padding:0; margin: 16px 18px; }
+#confirmDeleteModal .modal-header { margin:0; padding: 14px 18px; border-bottom:1px solid #e6f6fa; }
+#confirmDeleteMessage { color:#176d8a; margin:0; padding: 16px 18px 0; }
+#confirmDeleteModal .modal-actions { margin:0; padding: 12px 18px 16px; }
+
+/* Responsive helpers */
+.table-responsive { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+/* Give table a min width so it scrolls horizontally on small screens */
+.user-table { min-width:760px; }
+.col-file { max-width:420px; word-break: break-word; }
+
+@media (max-width:1200px){
+.page { width:95%; }
+.col-file { max-width:320px; }
+}
+@media (max-width:992px){
+.page-title { font-size:1.6rem; }
+.btn { min-width:95px; }
+.col-file { max-width:260px; }
+}
+@media (max-width:768px){
+.page { width:100%; padding:14px; border-radius:0; }
+.user-table th, .user-table td { white-space: normal; font-size:.85rem; padding:8px; }
+.btn { min-width:auto; padding:6px 10px; }
+.btn-action { min-width:auto; padding:4px 8px; }
+.rev-actions { gap:6px; }
+.fitup-header.no-frame .row { flex-direction:column; align-items:stretch; gap:8px; }
+.fitup-header.no-frame .form-control { width:100% !important; }
+#editFileName { width:100%; }
+.rev-inline { width:72px; }
+}
+@media (max-width:480px){
+.page-title { font-size:1.35rem; }
+.col-file { max-width:200px; }
+}
+.bulk-note { color:#176d8a; font-size:.9rem; margin-left:8px; }
+
+/* Upload status/progress styles */
+.upload-status { margin-top:8px; font-size:.85rem; color:#176d8a; font-weight:600; }
+.upload-status.error { color:#c62828; }
+.progress-bar-wrap { position:relative; width:240px; height:14px; border:1px solid #cce7ef; border-radius:7px; overflow:hidden; background:#fff; margin-top:6px; }
+.progress-bar-inner { position:absolute; left:0; top:0; bottom:0; width:0%; background:#1f99be; transition: width .2s ease; }
+.upload-list { margin-top:6px; list-style:none; padding:0; max-width:480px; }
+.upload-list li { display:flex; justify-content:space-between; align-items:center; padding:4px 6px; border:1px solid #e6f6fa; border-radius:4px; margin-bottom:4px; background:#f9fdff; font-size:.78rem; }
+.upload-list li span.status { font-weight:700; }
+.upload-list li span.status.ok { color:#0a7c53; }
+.upload-list li span.status.skip { color:#b26a00; }
+.upload-list li span.status.fail { color:#c62828; }
+
+/* Searchable select dropdown widget */
+.ss-wrap { position:relative; display:inline-block; vertical-align:middle; }
+.ss-wrap.w350 { width:350px; min-width:350px; }
+.ss-wrap.w130 { width:130px; }
+.ss-wrap.w90  { width:90px; min-width:90px; }
+.ss-input { width:100%; box-sizing:border-box; cursor:pointer; }
+.ss-input:focus { cursor:text; }
+.ss-list { display:none; position:absolute; left:0; right:0; top:100%; z-index:200; background:#fff; border:1px solid #1f99be; border-top:none; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,.12); }
+.ss-item { padding:6px 10px; cursor:pointer; font-size:.9rem; color:#176d8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ss-item:hover, .ss-item.ss-highlight { background:#e6f6fa; }
+.ss-item.ss-active { font-weight:700; }
+.ss-empty { padding:6px 10px; font-size:.85rem; color:#999; font-style:italic; }
+.ss-open .ss-input { border-radius:4px 4px 0 0; border-color:#1f99be; }

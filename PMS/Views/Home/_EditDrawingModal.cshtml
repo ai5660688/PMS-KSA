@@ -1,0 +1,25 @@
+<!-- Edit Drawing Modal (like Login Approval Edit) -->
+<div class="modal" id="editDrawingModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="editDrawingTitle">
+        <div class="modal-header">
+            <h2 class="modal-title" id="editDrawingTitle">Edit Drawing</h2>
+            <button class="close-modal" type="button" onclick="closeEditDrawingModal()">&times;</button>
+        </div>
+        <form id="editDrawingForm" asp-action="EditDrawing" asp-controller="Home" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="editDrawingId" name="id" />
+            <div class="form-group">
+                <label for="editFileName">File Name</label>
+                <input id="editFileName" name="fileName" type="text" class="form-control" maxlength="100" />
+            </div>
+            <div class="form-group">
+                <label for="editRevisionTag">Revision Tag</label>
+                <input id="editRevisionTag" name="revisionTag" type="text" class="form-control" maxlength="20" />
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closeEditDrawingModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>

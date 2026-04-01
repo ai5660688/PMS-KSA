@@ -1,0 +1,1130 @@
+﻿@model PMS.Models.DfrDailyFitupViewModel
+@{
+    Layout = null;
+    var antiForgery = Html.AntiForgeryToken();
+    DateTime? parsedFilterDate = null;
+    DateTime? parsedHeaderDate = null;
+    if(!string.IsNullOrWhiteSpace(Model.SearchFitupDate) && DateTime.TryParse(Model.SearchFitupDate, out var _sf)) { parsedFilterDate = _sf.Date; }
+    if(!string.IsNullOrWhiteSpace(Model.FitupDateHeader) && DateTime.TryParse(Model.FitupDateHeader, out var _hh)) { parsedHeaderDate = _hh.Date; }
+
+    // Helper lists (preserve server ordering unless noted)
+    var sortedLocationOptions = (Model.LocationOptions ?? new List<string>()).OrderBy(x => x).ToList();
+    var sortedJAddOptions = (Model.JAddOptions ?? new List<string>()).OrderBy(x => x).ToList();
+    var sortedWeldTypeOptions = Model.WeldTypeOptions ?? new List<string>();
+    var sortedMaterialDescriptions = Model.MaterialDescriptions ?? new List<string>();
+    var sortedMaterialGrades = (Model.MaterialGrades ?? new List<string>()).ToList();
+    var tackerOptions = Model?.TackerOptions ?? new List<PMS.Models.WelderSymbolOption>();
+
+    // Determine current header view to optionally hide Layout column when DWG is selected
+    var headerView = Context.Request.Query["headerView"].ToString();
+    var showLayoutCol = !string.Equals(headerView, "DWG", StringComparison.OrdinalIgnoreCase);
+
+    // Build small header metadata for fragment so AJAX loader can copy header values
+    var isAllLocation = string.Equals(Model?.SelectedLocation, "All", StringComparison.OrdinalIgnoreCase);
+    var dwrQrShop = Model?.FitupReportShop ?? string.Empty;
+    var dwrQrField = Model?.FitupReportField ?? string.Empty;
+    var dwrQrThreaded = Model?.FitupReportThreaded ?? string.Empty;
+    var dwrQrHeaderSingle = Model?.FitupReportHeader ?? string.Empty;
+    var dwrQrCombined = string.Join(" / ", new[]{ dwrQrShop ?? string.Empty, dwrQrField ?? string.Empty, dwrQrThreaded ?? string.Empty }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    var headerCombinedValue = !string.IsNullOrWhiteSpace(dwrQrCombined)
+        ? dwrQrCombined
+        : string.Join(" / ", new[]{ Model?.FitupReportShop ?? string.Empty, Model?.FitupReportField ?? string.Empty, Model?.FitupReportThreaded ?? string.Empty }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    var selLocForHeader = (Model?.SelectedLocation ?? string.Empty).Trim();
+    var headerSingleValue = string.Empty;
+    if(string.Equals(selLocForHeader, "Shop", StringComparison.OrdinalIgnoreCase))
+    {
+        headerSingleValue = !string.IsNullOrWhiteSpace(dwrQrShop) ? dwrQrShop : (Model?.FitupReportShop ?? string.Empty);
+    }
+    else if(string.Equals(selLocForHeader, "Field", StringComparison.OrdinalIgnoreCase))
+    {
+        headerSingleValue = !string.IsNullOrWhiteSpace(dwrQrField) ? dwrQrField : (Model?.FitupReportField ?? string.Empty);
+    }
+    else if(string.Equals(selLocForHeader, "Threaded", StringComparison.OrdinalIgnoreCase))
+    {
+        headerSingleValue = !string.IsNullOrWhiteSpace(dwrQrThreaded) ? dwrQrThreaded : (Model?.FitupReportThreaded ?? string.Empty);
+    }
+    if(string.IsNullOrWhiteSpace(headerSingleValue)) { headerSingleValue = !string.IsNullOrWhiteSpace(dwrQrHeaderSingle) ? dwrQrHeaderSingle : (Model?.FitupReportHeader ?? string.Empty); }
+
+    // Format header date values to datetime-local when present
+    string headerDateInputValue = string.Empty;
+    if(!string.IsNullOrWhiteSpace(Model?.FitupDateHeader))
+    {
+        var fmt = new[] { "dd-MMM-yyyy hh:mm tt", "dd-MMM-yyyy H:mm", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd HH:mm", "dd-MMM-yyyy" };
+        if(DateTime.TryParseExact(Model.FitupDateHeader, fmt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var _hdr))
+        {
+            headerDateInputValue = _hdr.ToString("yyyy-MM-dd'T'HH:mm");
+        }
+    }
+
+    // Guarded rows count to avoid null reference when Model.Rows is null
+    var rowCount = Model?.Rows?.Count ?? 0;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>PMS - DWR Editor</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" />
+    <link rel="stylesheet" href="~/css/DailyWelding.css" />
+    <link rel="stylesheet" href="~/css/DfrForm.css" />
+</head>
+<body>
+    @await Html.PartialAsync("~/Views/Shared/_DashboardHeader.cshtml")
+
+    <!-- Fragment start: contains only the DWR table + antiforgery + required scripts -->
+    <div id="dwr-table-fragment">
+    <div class="dfr-form-wrap">
+
+        @* Hidden header metadata so DailyWelding AJAX loader can copy header values (welding report inputs and reference boxes) *@
+        <div id="dwr-fragment-meta" style="display:none;">
+            @* Render the same visibility/disabled attributes as the main page so the AJAX loader can copy them back into the header *@
+            <input id="weldingReportCombinedInput" value="@headerCombinedValue" style="display:@(isAllLocation ? "" : "none")" @(isAllLocation ? null : "disabled") aria-label="Welding Report Combined" autocomplete="off" />
+            <input id="weldingReportHeaderInput" value="@headerSingleValue" style="display:@(isAllLocation ? "none" : "")" @(isAllLocation ? "disabled" : null) aria-label="Welding Report" autocomplete="off" />
+            <label id="weldingReportLabel" for="@(isAllLocation ? "weldingReportCombinedInput" : "weldingReportHeaderInput")">@(isAllLocation ? "Welding Report (WS/FW/TH)" : "Welding Report")</label>
+            @* Include header fitup/actual date inputs formatted for datetime-local *@
+            <input id="fitupDateInput" value="@headerDateInputValue" aria-label="Welding Date" />
+            <input id="actualDateInput" value="@headerDateInputValue" aria-label="Actual Welding Date" />
+            @* Carry headerView so consumer can tailor UI if needed *@
+            <input id="headerViewMeta" value="@headerView" aria-label="Header View" />
+        </div>
+
+        @* Hidden reference boxes section to allow DailyWelding to copy header values *@
+        <div class="ref-line" style="display:none;">
+            <div class="ref-boxes">
+                <div class="ref-box"><span>Line Class: @Model?.LineClass</span></div>
+                <div class="ref-box"><span>Material: @Model?.LineMaterial</span></div>
+                <div class="ref-box"><span>Category: @Model?.LineCategory</span></div>
+                <div class="ref-box"><span>RT Shop: @(Model?.RtShop is double rs ? (rs * 100).ToString("0.##") + "%" : null)</span></div>
+                <div class="ref-box"><span>RT Field: @(Model?.RtField is double rf ? (rf * 100).ToString("0.##") + "%" : null)</span></div>
+                <div class="ref-box"><span>PWHT Y/N: @(Model?.PwhtYN == true ? "Y" : Model?.PwhtYN == false ? "N" : null)</span></div>
+                <div class="ref-box"><span>PWHT >20mm: @(Model?.Pwht20mm is bool p20 ? (p20 ? "Y" : "N") : null)</span></div>
+                <div class="ref-box"><span>REV: @Model?.LsRev</span></div>
+            </div>
+        </div>
+
+        @* Header and form removed: DailyWelding page provides the header/filter UI. Only render the table here. *@
+
+        @if (rowCount == 0)
+        {
+            <div>
+                @if (string.Equals(headerView, "DWG", StringComparison.OrdinalIgnoreCase))
+                {
+                    <text>No rows loaded. Enter layout &amp; sheet then Load.</text>
+                }
+                else if (string.Equals(headerView, "Date", StringComparison.OrdinalIgnoreCase))
+                {
+                    <text>Select Date view then press Load.</text>
+                }
+                else if (string.Equals(headerView, "Report", StringComparison.OrdinalIgnoreCase))
+                {
+                    <text>Select Report view, enter a report filter (optional) then press Load.</text>
+                }
+                else
+                {
+                    <text>No data.</text>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="scroll-sync" id="scrollSync">
+                <div class="table-wrapper" id="tableWrapper">
+                    <div class="table-inner" id="tableInner">
+                        <table class="fitup" id="fitupTable">
+                            <thead>
+                                <tr>
+                                    <th class="col-sn">S/N</th>
+                                    @if (showLayoutCol) { <th class="col-layout">Layout</th> }
+                                    <th class="col-locjoint">Location / Joint</th>
+                                    <th class="col-wtype">Weld Type</th>
+                                    <th class="col-sheet">Sheet</th>
+                                    <th class="col-spno">SP. No.</th>
+                                    <th class="col-dia">Dia. In.</th>
+                                    <th class="col-olThick">Actual Thick.</th>
+                                    <th class="col-matA">Material A</th>
+                                    <th class="col-matB">Material B</th>
+                                    <th class="col-frep">Welding Report</th>
+                                    <th class="col-rfi">RFI No.</th>
+                                    <th class="col-fdate">Welding Date</th>
+                                    <th class="col-actualdate">Actual Date</th>
+                                    <th class="col-wps">WPS</th>
+                                    <th class="col-roota">ROOT A</th>
+                                    <th class="col-rootb">ROOT B</th>
+                                    <th class="col-filla">FILL A</th>
+                                    <th class="col-fillb">FILL B</th>
+                                    <th class="col-capa">CAP A</th>
+                                    <th class="col-capb">CAP B</th>
+                                    <th class="col-preheat">Preheat Temp ⁰C</th>
+                                    <th class="col-iport">IP or T</th>
+                                    <th class="col-del">Deleted</th>
+                                    <th class="col-can">Cancelled</th>
+                                    <th class="col-conf">Confirmed</th>
+                                    <th class="col-remarks">Remarks</th>
+                                    <th class="col-openclosed">Open/Closed</th>
+                                    <th class="col-updby">Updated By</th>
+                                    <th class="col-upddate">Updated Date</th>
+                                    @if(!string.Equals(headerView, "DWG", StringComparison.OrdinalIgnoreCase)) { <th class="col-dwg">DWG</th> }
+                                    <th class="col-clear">Clear</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    var sn = 0;
+                                    var rows = Model?.Rows ?? new List<PMS.Models.DfrRowVm>();
+                                }
+                                @foreach (var r in rows)
+                                {
+                                    // row FitupDate defaults from header/filter are no longer applied to welding view; show blank unless DWR has a date
+                                    var rowFitupDateValue = string.Empty;
+
+                                    // Prefer DWR values when present on the row; otherwise blank
+                                    double? preheatVal = null;
+                                    string displayPreheat = string.Empty;
+                                    object? displayUpdatedBy = null;
+                                    string? displayUpdatedDate = null;
+                                    var displayWeldingReport = string.Empty;
+
+                                    // New: DWR-backed overrides
+                                    int? dwrRfiId = null;
+                                    string? dwrRfiNo = null;
+                                    string? dwrFitupDateValue = null; // DATE_WELDED
+                                    string? dwrActualDateValue = null; // ACTUAL_DATE_WELDED
+                                    int? dwrWpsId = null;
+                                    string? dwrWpsText = null;
+                                    string? dwrRootA = null; string? dwrRootB = null; string? dwrFillA = null; string? dwrFillB = null; string? dwrCapA = null; string? dwrCapB = null;
+                                    string? dwrIPorT = null;
+                                    bool? dwrConfirmed = null;
+                                    bool? dwrCancelled = null;
+                                    string? dwrRemarks = null;
+                                        string? dwrOpenClosed = null;
+
+                                    try {
+                                        var t = r.GetType();
+                                        // PREHEAT
+                                        var preheatProp = t.GetProperty("PREHEAT_TEMP_C")
+                                            ?? t.GetProperty("PREHEAT_TEMPC")
+                                            ?? t.GetProperty("PREHEAT_TEMP")
+                                            ?? t.GetProperty("PREHEAT_C")
+                                            ?? t.GetProperties().FirstOrDefault(p => p.Name.IndexOf("PREHEAT", StringComparison.OrdinalIgnoreCase) >= 0 && p.Name.IndexOf("TEMP", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                                        object? rawPreheatValue = null;
+                                        if (preheatProp != null)
+                                        {
+                                            rawPreheatValue = preheatProp.GetValue(r);
+                                        }
+                                        else
+                                        {
+                                            try
+                                            {
+                                                if (r is System.Collections.IDictionary idict)
+                                                {
+                                                    foreach (System.Collections.DictionaryEntry de in idict)
+                                                    {
+                                                        var key = (de.Key ?? string.Empty).ToString() ?? string.Empty;
+                                                        if (key.IndexOf("PREHEAT", StringComparison.OrdinalIgnoreCase) >= 0 && key.IndexOf("TEMP", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                        {
+                                                            rawPreheatValue = de.Value;
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                else if (t.Name == "DataRowView")
+                                                {
+                                                    try
+                                                    {
+                                                        var dr = t.GetProperty("Row")?.GetValue(r);
+                                                        if (dr != null)
+                                                        {
+                                                            var table = dr.GetType().GetProperty("Table")?.GetValue(dr);
+                                                            if (table != null)
+                                                            {
+                                                                var columns = table.GetType().GetProperty("Columns")?.GetValue(table) as System.Collections.IEnumerable;
+                                                                if (columns != null)
+                                                                {
+                                                                    foreach (var col in columns)
+                                                                    {
+                                                                        var colName = col?.GetType().GetProperty("ColumnName")?.GetValue(col)?.ToString() ?? string.Empty;
+                                                                         if (colName.IndexOf("PREHEAT", StringComparison.OrdinalIgnoreCase) >= 0 && colName.IndexOf("TEMP", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                                        {
+                                                                            rawPreheatValue = dr.GetType().GetProperty("Item", new[] { typeof(string) })?.GetValue(dr, new object[] { colName });
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    catch { /* ignore fallback errors */ }
+                                                }
+                                            }
+                                            catch { /* ignore */ }
+                                        }
+
+                                        if (object.ReferenceEquals(rawPreheatValue, System.DBNull.Value)) rawPreheatValue = null;
+                                        if (rawPreheatValue != null)
+                                        {
+                                            var v = rawPreheatValue;
+                                            if (v is double dd) preheatVal = dd;
+                                            else if (v is float ff) preheatVal = (double)ff;
+                                            else if (v is decimal dec) preheatVal = (double)dec;
+                                            else if (v is int iInt) preheatVal = iInt;
+                                            else if (v is long lLong) preheatVal = lLong;
+                                            else if (v is short sShort) preheatVal = sShort;
+                                            else
+                                            {
+                                                var s = v?.ToString()?.Trim();
+                                                if (!string.IsNullOrWhiteSpace(s) && double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var pd))
+                                                {
+                                                    preheatVal = pd;
+                                                }
+                                            }
+                                        }
+
+                                        displayPreheat = preheatVal.HasValue
+                                            ? preheatVal.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                                            : string.Empty;
+
+                                        // Updated By / Date should come from DWR via controller; otherwise blank
+                                        try { displayUpdatedBy = r.UpdatedBy; displayUpdatedDate = r.UpdatedDate; } catch { }
+
+                                        // Welding Report from DWR
+                                        var qrProperty = t.GetProperty("POST_VISUAL_INSPECTION_QR_NO")
+                                            ?? t.GetProperty("PostVisualInspectionQrNo")
+                                            ?? t.GetProperty("Post_Visual_Inspection_QR_No")
+                                            ?? t.GetProperty("FitupReport")
+                                            ?? t.GetProperty("POST_VISUAL_INSPECTION_QR_NO_DWR");
+                                        var qrVal = qrProperty?.GetValue(r)?.ToString();
+                                        displayWeldingReport = !string.IsNullOrWhiteSpace(qrVal) ? qrVal : string.Empty;
+
+                                        // RFI from DWR only (do not fallback to DFR RFI_ID)
+                                        var rfiProperty = t.GetProperty("RFI_ID_DWR")
+                                            ?? t.GetProperty("RfiIdDwr")
+                                            ?? t.GetProperty("RfiId")
+                                            ?? t.GetProperty("RFI_ID");
+                                        var rfiVal = rfiProperty?.GetValue(r);
+                                        if(rfiVal != null && int.TryParse(rfiVal.ToString(), out var iv)) { dwrRfiId = iv; }
+                                        try {
+                                            if (dwrRfiId.HasValue && dwrRfiId.Value > 0)
+                                            {
+                                                var opt = ((Model?.RfiOptions) ?? new List<PMS.Models.RfiOption>()).FirstOrDefault(o => o.Id == dwrRfiId.Value);
+                                                dwrRfiNo = opt?.Value;
+                                                if (string.IsNullOrWhiteSpace(dwrRfiNo)) dwrRfiNo = opt?.Display ?? null;
+                                            }
+                                        } catch { }
+
+                                        // DATE_WELDED
+                                        var dateProperty = t.GetProperty("DATE_WELDED")
+                                            ?? t.GetProperty("Date_Welded")
+                                            ?? t.GetProperty("DateWelded")
+                                            ?? t.GetProperty("DATE_WELDED_D")
+                                            ?? t.GetProperty("FitupDate");
+                                        var dateVal = dateProperty?.GetValue(r);
+                                        if(dateVal is DateTime dwdt) { dwrFitupDateValue = dwdt.ToString("yyyy-MM-dd'T'HH:mm"); }
+                                        else if(DateTime.TryParse(dateVal?.ToString(), out var parsedDW)) { dwrFitupDateValue = parsedDW.ToString("yyyy-MM-dd'T'HH:mm"); }
+
+                                        // ACTUAL_DATE_WELDED
+                                        var actualProperty = t.GetProperty("ACTUAL_DATE_WELDED")
+                                            ?? t.GetProperty("ActualDateWelded")
+                                            ?? t.GetProperty("Actual_Date_Welded")
+                                            ?? t.GetProperty("ActualDate");
+                                        var actualVal = actualProperty?.GetValue(r);
+                                        if(actualVal is DateTime adt) { dwrActualDateValue = adt.ToString("yyyy-MM-dd'T'HH:mm"); }
+                                        else if(DateTime.TryParse(actualVal?.ToString(), out var parsedAD)) { dwrActualDateValue = parsedAD.ToString("yyyy-MM-dd'T'HH:mm"); }
+
+                                        // WPS (DWR only)
+                                        var wpsIdProperty = t.GetProperty("WPS_ID_DWR")
+                                            ?? t.GetProperty("WpsIdDwr");
+                                        var wpsIdVal = wpsIdProperty?.GetValue(r);
+                                        if(wpsIdVal != null && int.TryParse(wpsIdVal.ToString(), out var wv)) { dwrWpsId = wv; }
+                                        var wpsTextProperty = t.GetProperty("WPS_DWR")
+                                            ?? t.GetProperty("WpsDwr")
+                                            ?? t.GetProperty("WPS")
+                                            ?? t.GetProperty("Wps");
+                                        var wpsTextVal = wpsTextProperty?.GetValue(r)?.ToString();
+                                        if (dwrWpsId.HasValue && !string.IsNullOrWhiteSpace(wpsTextVal))
+                                        {
+                                            dwrWpsText = wpsTextVal;
+                                        }
+
+                                        // ROOT/FILL/CAP - try common name variants
+                                        string? TryGetStringProp(string name1, string? name2 = null, string? name3 = null)
+                                         {
+                                             var p = t.GetProperty(name1) ?? (name2 != null ? t.GetProperty(name2) : null) ?? (name3 != null ? t.GetProperty(name3) : null);
+                                             return p != null ? p.GetValue(r)?.ToString() : null;
+                                         }
+
+                                        dwrRootA = TryGetStringProp("ROOT_A", "RootA", "ROOTA") ?? TryGetStringProp("ROOT_A_DWR");
+                                        dwrRootB = TryGetStringProp("ROOT_B", "RootB", "ROOTB") ?? TryGetStringProp("ROOT_B_DWR");
+                                        dwrFillA = TryGetStringProp("FILL_A", "FillA", "FILLA") ?? TryGetStringProp("FILL_A_DWR");
+                                        dwrFillB = TryGetStringProp("FILL_B", "FillB", "FILLB") ?? TryGetStringProp("FILL_B_DWR");
+                                        dwrCapA = TryGetStringProp("CAP_A", "CapA", "CAPA") ?? TryGetStringProp("CAP_A_DWR");
+                                        dwrCapB = TryGetStringProp("CAP_B", "CapB", "CAPB") ?? TryGetStringProp("CAP_B_DWR");
+
+                                        // IP or T
+                                        var ipProperty = t.GetProperty("IP_or_T") ?? t.GetProperty("IPOrT") ?? t.GetProperty("IP_or_Tech") ?? t.GetProperty("IP_or_T_DWR");
+                                        var ipVal = ipProperty?.GetValue(r)?.ToString(); dwrIPorT = string.IsNullOrWhiteSpace(ipVal) ? null : ipVal;
+
+                                        // Confirmed (Weld_Confirmed)
+                                        var confProperty = t.GetProperty("Weld_Confirmed") ?? t.GetProperty("WELD_CONFIRMED");
+                                        var confVal = confProperty?.GetValue(r);
+                                        if(confVal != null && bool.TryParse(confVal.ToString(), out var cb)) dwrConfirmed = cb;
+
+                                        // Cancelled - best-effort
+                                        var cancProperty = t.GetProperty("Cancelled") ?? t.GetProperty("CANCELLED") ?? t.GetProperty("Weld_Cancelled");
+                                        var cancVal = cancProperty?.GetValue(r);
+                                        if(cancVal != null && bool.TryParse(cancVal.ToString(), out var canb)) dwrCancelled = canb;
+
+                                        // Remarks
+                                        var remProperty = t.GetProperty("DWR_REMARKS") ?? t.GetProperty("DwrRemarks") ?? t.GetProperty("Remarks") ?? t.GetProperty("DwrRemarksDisplay");
+                                        var remVal = remProperty?.GetValue(r)?.ToString(); dwrRemarks = string.IsNullOrWhiteSpace(remVal) ? null : remVal;
+
+                                        // Open/Closed
+                                        var ocProperty = t.GetProperty("Open_Closed") ?? t.GetProperty("OpenClosed") ?? t.GetProperty("OPEN_CLOSED");
+                                        var ocVal = ocProperty?.GetValue(r)?.ToString(); dwrOpenClosed = string.IsNullOrWhiteSpace(ocVal) ? null : ocVal;
+
+                                    } catch { /* best-effort reflection - ignore */ }
+
+                                    // Determine normalized location code for this row: WS/FW/TH
+                                    string __locCode = "";
+                                    try {
+                                        var rawLoc = r.Location?.Trim() ?? string.Empty;
+                                        var wt = r.WeldType?.Trim() ?? string.Empty;
+                                        if (!string.IsNullOrWhiteSpace(wt) && wt.ToUpperInvariant().Contains("TH")) { __locCode = "TH"; }
+                                        else if (!string.IsNullOrWhiteSpace(rawLoc)) {
+                                            var up = rawLoc.ToUpperInvariant();
+                                            if (up.Contains("SHOP") || up.Contains("WORK") || up.StartsWith("WS")) __locCode = "WS";
+                                            else __locCode = "FW";
+                                        }
+                                    } catch { }
+
+                                    // Determine values used in rendering (prefer DWR values only)
+                                    var renderFitupDate = !string.IsNullOrWhiteSpace(dwrFitupDateValue) ? dwrFitupDateValue : string.Empty;
+                                    var renderActualDate = !string.IsNullOrWhiteSpace(dwrActualDateValue) ? dwrActualDateValue : string.Empty;
+                                    var renderRfiId = dwrRfiId; // DWR only
+                                    var renderRfiNo = dwrRfiNo;  // DWR only
+                                    var renderWpsId = dwrWpsId;
+                                    // Resolve WPS text strictly from DWR data; when only an Id exists, use header options to display that Id's text
+                                    var renderWpsStr = !string.IsNullOrWhiteSpace(dwrWpsText)
+                                        ? dwrWpsText
+                                        : ((renderWpsId.HasValue && renderWpsId.Value > 0)
+                                            ? (((Model?.WpsOptions) ?? new List<PMS.Models.WpsOption>()).FirstOrDefault(o => o.Id == renderWpsId.Value)?.Wps ?? string.Empty)
+                                            : string.Empty);
+
+                                    // Preheat already normalized above (blank when missing)
+                                    // UpdatedBy/UpdatedDate already sourced from DWR via controller (blank when missing)
+                                    var renderRemarks = dwrRemarks ?? string.Empty; // DWR only
+                                    var renderConfirmed = dwrConfirmed ?? false; // DWR only
+                                    var renderCancelled = dwrCancelled ?? false; // DWR only
+                                    var renderDeleted = r.Deleted; // keep deleted from DFR as a row state
+                                    var missingFitupDate = string.IsNullOrWhiteSpace(r.FitupDate);
+
+                                    var locked = renderConfirmed || missingFitupDate;
+
+                                    // Build merged Location/Joint/J-Add column
+                                    string mergedLocJoint = string.Empty;
+                                    try {
+                                        var loc = r.Location?.Trim() ?? string.Empty;
+                                        var joint = r.WeldNumber?.Trim() ?? string.Empty;
+                                        var jadd = r.JAdd?.Trim() ?? string.Empty;
+                                        var basePart = string.IsNullOrWhiteSpace(loc) ? joint : (string.IsNullOrWhiteSpace(joint) ? loc : (loc + "-" + joint));
+                                        if(string.IsNullOrWhiteSpace(jadd) || string.Equals(jadd, "NEW", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            mergedLocJoint = basePart;
+                                        }
+                                        else
+                                        {
+                                            mergedLocJoint = basePart + "-" + jadd;
+                                        }
+                                    } catch { mergedLocJoint = (r.Location + "-" + r.WeldNumber + (string.IsNullOrWhiteSpace(r.JAdd)?"":"-"+r.JAdd)); }
+
+                                     <tr data-id="@r.JointId" data-location-code="@__locCode" class="@(locked ? "locked" : string.Empty) @(missingFitupDate ? "missing-fitup" : string.Empty)">
+                                        <td class="col-sn">@(++sn)</td>
+                                        @if (showLayoutCol) { <td class="col-layout">@r.LayoutNumber</td> }
+                                        <td class="col-locjoint @(r.DfrOnHold ? "hold-alert" : null)">@mergedLocJoint</td>
+                                        @* Hidden normalized location cell for client scripts *@
+                                        <td class="col-location" style="display:none">@__locCode</td>
+                                        <td class="col-wtype">@r.WeldType</td>
+                                        <td class="col-sheet @(r.SheetOnHold ? "hold-alert" : null)">@r.Sheet</td>
+                                        <td class="col-spno @(r.SpOnHold ? "hold-alert" : null)">@r.SpoolNo</td>
+                                        <td class="col-dia">@r.DiaIn</td>
+                                        <td class="col-olThick">@r.OlThick</td>
+                                        <td class="col-matA">@r.MaterialA</td>
+                                        <td class="col-matB">@r.MaterialB</td>
+                                        <td class="col-frep"><input data-name="FitupReport" name="FitupReport" value="@displayWeldingReport" @(locked ? "disabled" : null) aria-label="Welding Report" autocomplete="off" /></td>
+                                        <td class="col-rfi">
+                                            @{
+                                                // Render a minimal per-row RFI select. The full option list is fetched asynchronously per-row
+                                                // by dailywelding.js via GetWeldingRfiOptions. If this row already has a DWR RFI saved, render a
+                                                // single selected fallback option so the UI shows the saved value until the async loader runs.
+                                                var rfiIdVal = renderRfiId ?? 0;
+                                                var hasDwrRfi = rfiIdVal > 0;
+                                                var fallbackText = hasDwrRfi ? (!string.IsNullOrWhiteSpace(renderRfiNo) ? renderRfiNo : rfiIdVal.ToString(System.Globalization.CultureInfo.InvariantCulture)) : string.Empty;
+                                            }
+                                            <select data-name="RFI_ID_DWR" data-rfi-name="RfiId" name="RFI_ID_DWR" class="rfi-async-select rfi-select" data-project="@(Model?.SelectedProjectId ?? 0)" data-fitupdate="@(Model?.FitupDateHeader ?? string.Empty)" data-placeholder="&#160;" @(locked ? "disabled" : null) aria-label="RFI No.">
+                                                @* Start with a visible blank option *@
+                                                @if (!hasDwrRfi)
+                                                {
+                                                        <option value="" data-display="" selected="selected">&nbsp;</option>
+                                                }
+                                                else
+                                                {
+                                                        <option value="" data-display="">&nbsp;</option>
+                                                }
+                                                @* If this row has a saved DWR RFI id, render it as a fallback selected option so it's visible until async load populates list *@
+                                                @if (hasDwrRfi)
+                                                {
+                                                    var fbEncoded = System.Net.WebUtility.HtmlEncode(fallbackText ?? string.Empty);
+                                                    <option value="@rfiIdVal" data-display="@fbEncoded" selected="selected">@fallbackText</option>
+                                                }
+                                            </select>
+                                         </td>
+                                        <td class="col-fdate"><input type="datetime-local" data-name="DATE_WELDED" name="DATE_WELDED" value="@renderFitupDate" @(locked?"disabled":null) aria-label="Welding Date" /></td>
+                                        <td class="col-actualdate"><input type="datetime-local" data-name="ACTUAL_DATE_WELDED" name="ACTUAL_DATE_WELDED" value="@renderActualDate" @(locked?"disabled":null) aria-label="Actual Date" /></td>
+                                        <td class="col-wps" data-col="wps">
+                                            @{
+                                                var baseWpsCandidates = r.WpsCandidates ?? new List<PMS.Models.WpsOption>();
+                                                var selectedWps = renderWpsStr ?? string.Empty;
+                                                var selectedId = renderWpsId;
+                                                var effectiveCandidates = baseWpsCandidates;
+                                                if ((effectiveCandidates == null || effectiveCandidates.Count == 0) && !string.IsNullOrWhiteSpace(selectedWps))
+                                                {
+                                                    effectiveCandidates = new List<PMS.Models.WpsOption>
+                                                    {
+                                                        new PMS.Models.WpsOption { Id = selectedId ?? 0, Wps = selectedWps }
+                                                    };
+                                                }
+                                                var hasCandidates = effectiveCandidates != null && effectiveCandidates.Count > 0;
+                                                bool CandidateMatches(PMS.Models.WpsOption opt)
+                                                    => !string.IsNullOrWhiteSpace(selectedWps)
+                                                       && string.Equals(opt.Wps, selectedWps, StringComparison.OrdinalIgnoreCase);
+                                                var hasSelectedCandidate = hasCandidates && effectiveCandidates!.Any(opt => CandidateMatches(opt) || (selectedId.HasValue && opt.Id == selectedId.Value));
+                                            }
+                                            @if (hasCandidates)
+                                            {
+                                                <select data-name="WPS_ID_DWR" name="WPS_ID_DWR" class="wps-select" style="width:160px" @(locked?"disabled":null)>
+                                                    @foreach (var cand in effectiveCandidates!)
+                                                    {
+                                                        var optionTitle = $"t: {cand.ThicknessRange ?? string.Empty} PWHT: {(cand.Pwht == true ? "Y" : "N" )}";
+                                                        var isSelected = CandidateMatches(cand) || (selectedId.HasValue && cand.Id == selectedId.Value);
+                                                        if (isSelected)
+                                                        {
+                                                            <option data-wps-id="@cand.Id" value="@cand.Wps" title="@optionTitle" selected="selected">@cand.Wps</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option data-wps-id="@cand.Id" value="@cand.Wps" title="@optionTitle">@cand.Wps</option>
+                                                        }
+                                                    }
+                                                    @if (!hasSelectedCandidate && !string.IsNullOrWhiteSpace(selectedWps))
+                                                    {
+                                                        <option data-wps-id="@(selectedId ?? 0)" value="@selectedWps" selected="selected" title="Saved">@selectedWps</option>
+                                                    }
+                                                    @if (string.IsNullOrWhiteSpace(selectedWps))
+                                                    {
+                                                        <option value="" selected="selected"></option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value=""></option>
+                                                    }
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <input data-name="WPS_ID_DWR" name="WPS_ID_DWR" value="@selectedWps" @(locked?"disabled":null) style="width:160px" autocomplete="off" />
+                                            }
+                                        </td>
+                                        <td class="col-roota">
+                                            <select data-name="TackWelder" name="TackWelder" @(locked?"disabled":null) aria-label="Root A">
+                                                @{
+                                                    var tackers = tackerOptions;
+                                                    var selRootA = dwrRootA ?? string.Empty;
+                                                    var hasSelRootA = !string.IsNullOrWhiteSpace(selRootA);
+                                                }
+                                                @if (!hasSelRootA)
+                                                {
+                                                    <option value="" selected="selected"></option>
+                                                }
+                                                else
+                                                {
+                                                    <option value=""></option>
+                                                }
+                                                @foreach (var t in tackers)
+                                                {
+                                                    if (hasSelRootA && string.Equals(t.Symbol, selRootA, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@t.Symbol" selected="selected">@t.Symbol</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@t.Symbol">@t.Symbol</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="col-rootb">
+                                            <select data-name="TackWelderB" name="TackWelderB" @(locked?"disabled":null) aria-label="Root B">
+                                                @{
+                                                    var tackersB = tackerOptions;
+                                                    var selRootB = dwrRootB ?? string.Empty;
+                                                    var hasSelRootB = !string.IsNullOrWhiteSpace(selRootB);
+                                                }
+                                                @if (!hasSelRootB)
+                                                {
+                                                    <option value="" selected="selected"></option>
+                                                }
+                                                else
+                                                {
+                                                    <option value=""></option>
+                                                }
+                                                @foreach (var t in tackersB)
+                                                {
+                                                    if (hasSelRootB && string.Equals(t.Symbol, selRootB, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@t.Symbol" selected="selected">@t.Symbol</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@t.Symbol">@t.Symbol</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="col-filla">
+                                            <select data-name="TackWelderFillA" name="TackWelderFillA" @(locked?"disabled":null) aria-label="Fill A">
+                                                @{
+                                                    var tackersFillA = tackerOptions;
+                                                    var selFillA = dwrFillA ?? string.Empty;
+                                                    var hasSelFillA = !string.IsNullOrWhiteSpace(selFillA);
+                                                }
+                                                @if (!hasSelFillA)
+                                                {
+                                                    <option value="" selected="selected"></option>
+                                                }
+                                                else
+                                                {
+                                                    <option value=""></option>
+                                                }
+                                                @foreach (var t in tackersFillA)
+                                                {
+                                                    if (hasSelFillA && string.Equals(t.Symbol, selFillA, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@t.Symbol" selected="selected">@t.Symbol</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@t.Symbol">@t.Symbol</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="col-fillb">
+                                            <select data-name="TackWelderFillB" name="TackWelderFillB" @(locked?"disabled":null) aria-label="Fill B">
+                                                @{
+                                                    var tackersFillB = tackerOptions;
+                                                    var selFillB = dwrFillB ?? string.Empty;
+                                                    var hasSelFillB = !string.IsNullOrWhiteSpace(selFillB);
+                                                }
+                                                @if (!hasSelFillB)
+                                                {
+                                                    <option value="" selected="selected"></option>
+                                                }
+                                                else
+                                                {
+                                                    <option value=""></option>
+                                                }
+                                                @foreach (var t in tackersFillB)
+                                                {
+                                                    if (hasSelFillB && string.Equals(t.Symbol, selFillB, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@t.Symbol" selected="selected">@t.Symbol</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@t.Symbol">@t.Symbol</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="col-capa">
+                                            <select data-name="TackWelderCapA" name="TackWelderCapA" @(locked?"disabled":null) aria-label="Cap A">
+                                                @{
+                                                    var tackersCapA = tackerOptions;
+                                                    var selCapA = dwrCapA ?? string.Empty;
+                                                    var hasSelCapA = !string.IsNullOrWhiteSpace(selCapA);
+                                                }
+                                                @if (!hasSelCapA)
+                                                {
+                                                    <option value="" selected="selected"></option>
+                                                }
+                                                else
+                                                {
+                                                    <option value=""></option>
+                                                }
+                                                @foreach (var t in tackersCapA)
+                                                {
+                                                    if (hasSelCapA && string.Equals(t.Symbol, selCapA, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@t.Symbol" selected="selected">@t.Symbol</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@t.Symbol">@t.Symbol</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="col-capb">
+                                            <select data-name="TackWelderCapB" name="TackWelderCapB" @(locked?"disabled":null) aria-label="Cap B">
+                                                @{
+                                                    var tackersCapB = tackerOptions;
+                                                    var selCapB = dwrCapB ?? string.Empty;
+                                                    var hasSelCapB = !string.IsNullOrWhiteSpace(selCapB);
+                                                }
+                                                @if (!hasSelCapB)
+                                                {
+                                                    <option value="" selected="selected"></option>
+                                                }
+                                                else
+                                                {
+                                                    <option value=""></option>
+                                                }
+                                                @foreach (var t in tackersCapB)
+                                                {
+                                                    if (hasSelCapB && string.Equals(t.Symbol, selCapB, System.StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <option value="@t.Symbol" selected="selected">@t.Symbol</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@t.Symbol">@t.Symbol</option>
+                                                    }
+                                                }
+                                            </select>
+                                        </td>
+                                        <td class="col-preheat">
+                                            <input data-name="PreheatTempC" name="PreheatTempC" autocomplete="off" inputmode="decimal" value="@displayPreheat" @(locked?"disabled":null) aria-label="Preheat Temp °C" />
+                                        </td>
+                                        <td class="col-iport">
+                                            @{
+                                                var renderIP = (dwrIPorT ?? string.Empty).Trim();
+                                                var ipOptions = (Model?.IpOrTOptions ?? new List<string>())
+                                                    .Where(o => !string.IsNullOrWhiteSpace(o))
+                                                    .Select(o => o.Trim())
+                                                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                                                    .OrderBy(o => o, StringComparer.OrdinalIgnoreCase)
+                                                    .ToList();
+                                                var hasIpOptions = ipOptions.Count > 0;
+                                                var optionMatched = hasIpOptions && ipOptions.Any(o => string.Equals(o, renderIP, StringComparison.OrdinalIgnoreCase));
+                                                var optionBuilder = new System.Text.StringBuilder();
+                                                void AppendOption(string value, bool selected, string display)
+                                                {
+                                                    var encodedValue = System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
+                                                    var encodedDisplay = System.Net.WebUtility.HtmlEncode(display ?? string.Empty);
+                                                    optionBuilder.Append("<option value=\"").Append(encodedValue).Append("\"");
+                                                    if (selected)
+                                                    {
+                                                        optionBuilder.Append(" selected=\"selected\"");
+                                                    }
+                                                    optionBuilder.Append(">")
+                                                                 .Append(encodedDisplay)
+                                                                 .Append("</option>");
+                                                }
+
+                                                AppendOption("IP", string.Equals(renderIP, "IP", StringComparison.OrdinalIgnoreCase), "IP");
+                                                AppendOption("T", string.Equals(renderIP, "T", StringComparison.OrdinalIgnoreCase), "T");
+
+                                                if (hasIpOptions)
+                                                {
+                                                    foreach (var opt in ipOptions)
+                                                    {
+                                                        AppendOption(opt, string.Equals(opt, renderIP, StringComparison.OrdinalIgnoreCase), opt);
+                                                    }
+                                                    if (!string.IsNullOrWhiteSpace(renderIP) && !optionMatched && !string.Equals(renderIP, "IP", StringComparison.OrdinalIgnoreCase) && !string.Equals(renderIP, "T", StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        AppendOption(renderIP, true, renderIP);
+                                                    }
+                                                }
+
+                                                // trailing blank option as default
+                                                AppendOption(string.Empty, string.IsNullOrWhiteSpace(renderIP), " ");
+                                            }
+                                            <select data-name="IP_or_T" name="IP_or_T" @(locked?"disabled":null) aria-label="IP or T">@Html.Raw(optionBuilder.ToString())</select>
+                                        </td>
+                                        @{
+                                            var disableDelCan = string.Equals(headerView, "DWG", StringComparison.OrdinalIgnoreCase);
+                                        }
+                                        <td class="col-del chk-cell"><input type="checkbox" data-name="Deleted" name="Deleted" @(renderDeleted?"checked":null) @((locked || disableDelCan)?"disabled":null) aria-label="Deleted" /></td>
+                                        <td class="col-can chk-cell"><input type="checkbox" data-name="Cancelled" name="Cancelled" @(renderCancelled?"checked":null) @((locked || disableDelCan)?"disabled":null) aria-label="Cancelled" /></td>
+                                        <td class="col-conf chk-cell"><input type="checkbox" data-name="FitupConfirmed" name="FitupConfirmed" @(renderConfirmed?"checked":null) @(locked?"disabled":null) aria-label="Confirmed" /></td>
+                                        <td class="col-remarks"><input data-name="Remarks" name="Remarks" value="@renderRemarks" @(locked?"disabled":null) aria-label="Remarks" /></td>
+                                        <td class="col-openclosed">
+                                            @{ 
+                                                var renderOC = dwrOpenClosed; // DWR only
+                                                var renderOcVal2 = (renderOC ?? "").Trim();
+                                            }
+                                            @if (string.Equals(renderOcVal2, "Open", System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <select data-name="Open_Closed" name="Open_Closed" @(locked?"disabled":null) aria-label="Open or Closed">
+                                                    <option value="Open" selected="selected">Open</option>
+                                                    <option value="Closed">Closed</option>
+                                                </select>
+                                            }
+                                            else if (string.Equals(renderOcVal2, "Closed", System.StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <select data-name="Open_Closed" name="Open_Closed" @(locked?"disabled":null) aria-label="Open or Closed">
+                                                    <option value="Open">Open</option>
+                                                    <option value="Closed" selected="selected">Closed</option>
+                                                </select>
+                                            }
+                                            else
+                                            {
+                                                <select data-name="Open_Closed" name="Open_Closed" @(locked?"disabled":null) aria-label="Open or Closed">
+                                                    <option value=""> </option>
+                                                    <option value="Open">Open</option>
+                                                    <option value="Closed">Closed</option>
+                                                </select>
+                                            }
+                                        </td>
+                                        <td class="col-updby"><strong>@(displayUpdatedBy ?? string.Empty)</strong></td>
+                                        <td class="col-upddate"><strong>@(displayUpdatedDate ?? string.Empty)</strong></td>
+                                        @if(!string.Equals(headerView, "DWG", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <td class="col-dwg row-actions"><button type="button" class="open-dwg-row btn btn-outline" data-layout="@r.LayoutNumber" data-sheet="@r.Sheet">Open DWG</button></td>
+                                        }
+                                        <td class="col-clear row-actions"><button type="button" class="clear-row btn btn-outline" @(locked?"disabled":null) aria-label="Clear Row">Clear</button></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="bottom-scroll" id="bottomScroll">
+                    <div class="bottom-scroll-inner" id="bottomScrollInner"></div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Anti-forgery token and all DWR-specific scripts are included inside the fragment so they can be injected when fragment is loaded into DailyWelding -->
+    <div style="display:none">@antiForgery</div>
+    <script>
+        // Minimal wiring: save to DWR endpoint for Daily Welding
+        const token=document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        function status(msg,ok){
+            const host=document.getElementById('statusMsg');
+            if(host){ host.textContent=msg; host.style.color=ok?'#176d8a':'#b40000'; if(ok) setTimeout(()=>{ if(host.textContent===msg) host.textContent=''; },2500); }
+            const e=document.getElementById('dfrMsg');
+            if(e){ e.textContent=msg; e.style.color=ok?'#176d8a':'#b40000'; if(ok) setTimeout(()=>{ if(e.textContent===msg) e.textContent=''; },2500);} 
+        }
+        // Centralized response handling to match Daily Fit-up messaging
+        function handleBulkUpdateResponse(resp){
+            try{
+                document.querySelectorAll('#fitupTable tbody tr.validation-skip').forEach(r=> r.classList.remove('validation-skip'));
+                const updated = Number(resp && resp.updated) || 0;
+                const skipped = Number(resp && resp.skipped) || 0;
+                const errors = Array.isArray(resp && resp.errors) ? resp.errors : [];
+                errors.forEach(err => {
+                    const id = err && (err.id || err.Id || err.JointId);
+                    if(id!==undefined && id!==null){
+                        const tr = document.querySelector(`#fitupTable tbody tr[data-id='${id}']`);
+                        if(tr) tr.classList.add('validation-skip');
+                    }
+                });
+                let mainMsg = '';
+                if(skipped>0){
+                    if(updated>0) mainMsg = `Saved ${updated} row(s). Skipped ${skipped} row(s).`;
+                    else mainMsg = `Skipped ${skipped} row(s).`;
+                } else {
+                    if(updated>0) mainMsg = `Saved ${updated} row(s) successfully.`;
+                    else mainMsg = 'No changes saved.';
+                }
+                if(errors.length>0 && errors[0].message){
+                    const firstMsg = String(errors[0].message).replace(/^Skipped:\s*/i,'')
+                    status(`${mainMsg} ${firstMsg}`, skipped===0 && updated>0);
+                } else {
+                    status(mainMsg, skipped===0 && updated>0);
+                }
+            } catch(e){ console.error('handleBulkUpdateResponse error', e); }
+        }
+        (function(){
+            const table = document.getElementById('fitupTable');
+            function markDirty(el){ try{ const tr = el.closest('tr'); if(tr){ tr.dataset.dirty='1'; tr.classList.add('dirty'); } } catch(e){} }
+            function getFieldValue(input){
+                if(!input) return null;
+                const name = input.getAttribute('data-name') || input.name || '';
+                let value = null;
+                if(input.tagName === 'SELECT'){ value = input.value; }
+                else if(input.type === 'checkbox'){ value = input.checked; }
+                else { value = input.value; }
+                // normalize blanks to null for non-checkbox
+                if(input.type !== 'checkbox' && typeof value === 'string'){
+                    const t = value.trim();
+                    value = t.length ? t : null;
+                }
+                // coerce numeric-like fields
+                try{
+                    if(value != null){
+                        if(name === 'PreheatTempC'){
+                            const f = parseFloat(value);
+                            value = isNaN(f) ? null : f;
+                        }
+                        else if(name === 'RFI_ID_DWR'){
+                            const i = parseInt(value, 10);
+                            value = isNaN(i) ? null : i;
+                        }
+                    }
+                }catch{}
+                return { name, value };
+            }
+            function collectRowPayload(tr){
+                const id = parseInt(tr?.dataset?.id||'0',10) || 0;
+                const payload = { JointId: id };
+                // helper to find input/select by data-name within this row
+                const q = (name) => tr.querySelector('[data-name="' + name + '"]');
+
+                if (id <= 0) return payload;
+
+                // FitupReport (Welding Report)
+                try {
+                    const fr = q('FitupReport');
+                    if (fr) { const v = (fr.value || '').toString().trim(); payload.FitupReport = v.length ? v : null; }
+                } catch {}
+
+                // RFI -> RfiId and optional RfiDisplay
+                try {
+                    const rfi = q('RFI_ID_DWR');
+                    if (rfi) {
+                        const v = (rfi.value || '').toString().trim();
+                        const vi = parseInt(v, 10);
+                        payload.RfiId = (!isNaN(vi) && vi > 0) ? vi : null;
+                        try {
+                            const opt = rfi.options[rfi.selectedIndex];
+                            const displayAttr = opt ? (opt.getAttribute('data-display') || opt.text) : null;
+                            const display = displayAttr ? displayAttr.toString().trim() : null;
+                            payload.RfiDisplay = display && display.length ? display : null;
+                        } catch(e) { /* ignore */ }
+                    }
+                } catch {}
+
+                // Dates
+                try { const d1 = q('DATE_WELDED'); payload.FitupDate = d1 && d1.value ? d1.value : null; } catch {}
+                try { const d2 = q('ACTUAL_DATE_WELDED'); payload.ActualDate = d2 && d2.value ? d2.value : null; } catch {}
+
+                // WPS: prefer data-wps-id when present, always send text as Wps
+                try {
+                    const wps = q('WPS_ID_DWR');
+                    if (wps) {
+                        if (wps.tagName === 'SELECT') {
+                            const sel = wps;
+                            const opt = sel.options[sel.selectedIndex];
+                            const wid = opt ? parseInt(opt.getAttribute('data-wps-id') || '', 10) : NaN;
+                            payload.WpsId = (!isNaN(wid) && wid > 0) ? wid : null;
+                            const text = (sel.value || '').toString().trim(); payload.Wps = text.length ? text : null;
+                        } else {
+                            const text = (wps.value || '').toString().trim(); payload.Wps = text.length ? text : null;
+                        }
+                    }
+                } catch {}
+
+                // Tack welders and related DWR fields
+                try {
+                    ['TackWelder','TackWelderB','TackWelderFillA','TackWelderFillB','TackWelderCapA','TackWelderCapB'].forEach(n => {
+                        const el = q(n);
+                        if (el) { const v = (el.value || '').toString().trim(); if (v.length) payload[n] = v; }
+                    });
+                } catch {}
+
+                // Preheat numeric
+                try { const p = q('PreheatTempC'); if (p) { const f = parseFloat(p.value); payload.PreheatTempC = isNaN(f) ? null : f; } } catch {}
+
+                // IP_or_T and Open_Closed
+                try { const ip = q('IP_or_T'); if (ip) { const v = (ip.value||'').toString().trim(); payload.IP_or_T = v.length ? v : null; } } catch {}
+                try { const oc = q('Open_Closed'); if (oc) { const v = (oc.value||'').toString().trim(); payload.Open_Closed = v.length ? v : null; } } catch {}
+
+                // Flags
+                try { const del = q('Deleted'); if (del) payload.Deleted = (del.type === 'checkbox') ? del.checked : ((del.value||'')==='true'); } catch {}
+                try { const can = q('Cancelled'); if (can) payload.Cancelled = (can.type === 'checkbox') ? can.checked : ((can.value||'')==='true'); } catch {}
+                try { const conf = q('FitupConfirmed'); if (conf) payload.FitupConfirmed = (conf.type === 'checkbox') ? conf.checked : ((conf.value||'')==='true'); } catch {}
+
+                // Remarks
+                try { const rm = q('Remarks'); if (rm) { const v = (rm.value||'').toString().trim(); payload.Remarks = v.length ? v : null; } } catch {}
+
+                return payload;
+            }
+            function onChange(e){ const t = e.target; if(!t) return; if(t.matches('input[data-name], select[data-name]')){ markDirty(t); } }
+            if(table){
+                table.addEventListener('change', onChange);
+                table.addEventListener('input', onChange);
+            }
+
+            // Mirror header tacker auto-fill inside the table: Root A drives other tacker selects in the same row
+            if(table){
+                const dependentNames = ['TackWelderB','TackWelderFillA','TackWelderFillB','TackWelderCapA','TackWelderCapB'];
+                function findMatchingOption(selectEl, sourceValue){
+                    if(!selectEl) return null;
+                    const opts = Array.from(selectEl.options);
+                    if(!sourceValue) return '';
+                    const trimmed = sourceValue.trim();
+                    if(!trimmed) return '';
+                    const exact = opts.find(o => (o.value || '').trim() === sourceValue);
+                    if(exact) return exact.value;
+                    const ciExact = opts.find(o => (o.value || '').trim().toLowerCase() === trimmed.toLowerCase());
+                    if(ciExact) return ciExact.value;
+                    const textMatch = opts.find(o => (o.text || '').trim().toLowerCase() === trimmed.toLowerCase());
+                    if(textMatch) return textMatch.value;
+                    const partial = opts.find(o => (o.text || '').toLowerCase().includes(trimmed.toLowerCase()));
+                    if(partial) return partial.value;
+                    return null;
+                }
+                function syncRowTackers(rootSelect){
+                    if(!rootSelect) return;
+                    const row = rootSelect.closest('tr');
+                    if(!row) return;
+                    const sourceValue = (rootSelect.value || '').trim();
+                    dependentNames.forEach(name => {
+                        const target = row.querySelector(`select[data-name="${name}"]`);
+                        if(!target) return;
+                        const nextValue = sourceValue ? findMatchingOption(target, sourceValue) : '';
+                        if(sourceValue && nextValue === null) return;
+                        const appliedValue = sourceValue ? nextValue : '';
+                        if(target.value !== appliedValue){
+                            target.value = appliedValue;
+                            target.dispatchEvent(new Event('change',{ bubbles:true }));
+                        }
+                    });
+                }
+                table.addEventListener('change', function(e){
+                    const target = e.target;
+                    if(target && target.matches('select[data-name="TackWelder"]')){
+                        syncRowTackers(target);
+                    }
+                });
+            }
+             window.__collectDwrDirtyPayload = function(){
+                 const dirty=[...document.querySelectorAll('#fitupTable tbody tr')].filter(r=>r.dataset.dirty==='1');
+                 return dirty.map(collectRowPayload);
+             };
+         })();
+        // Improved save loop: prevent re-entrancy, debounce rapid clicks, disable buttons during save
+        let __saving = false;
+        let __saveTimer = null;
+        async function save(){
+            // simple debounce: collapse multiple clicks into one within 200ms
+            if(__saveTimer){ clearTimeout(__saveTimer); }
+            return new Promise(resolve => {
+                __saveTimer = setTimeout(async ()=>{
+                    if(__saving) { resolve(); return; }
+                    const dirtyPayload = (typeof window.__collectDwrDirtyPayload==='function') ? window.__collectDwrDirtyPayload() : [];
+                    if(!dirtyPayload || dirtyPayload.length===0){ status('No changes saved.', false); resolve(); return; }
+                    __saving = true;
+                    // disable save buttons while saving
+                    const btns = [document.getElementById('btnSave'), document.getElementById('saveAllBtn')].filter(Boolean);
+                    btns.forEach(b=>{ try{ if(!b.dataset.prevText){ b.dataset.prevText = b.textContent || ''; } b.disabled = true; b.classList.add('disabled'); b.textContent = 'Saving...'; }catch{} });
+                    status(`Saving ${dirtyPayload.length} row(s)...`, true);
+                    try{
+                        const res = await fetch('/Home/BulkUpdateDwrRows',{ method:'POST', headers:{ 'Content-Type':'application/json','RequestVerificationToken': token }, body: JSON.stringify(dirtyPayload) });
+                        if(res.ok){
+                            let payload = null;
+                            try { payload = await res.json(); } catch { payload = { updated: dirtyPayload.length, skipped: 0, errors: [] }; }
+                            handleBulkUpdateResponse(payload);
+                        } else {
+                            // try to read error text
+                            let t='Save failed';
+                            try { t = await res.text(); } catch{}
+                            status(t || 'Save failed', false);
+                        }
+                    }
+                    catch(e){ status('Error saving',false); }
+                    finally{
+                        __saving = false;
+                        btns.forEach(b=>{ try{ b.disabled = false; b.classList.remove('disabled'); if(Object.prototype.hasOwnProperty.call(b.dataset,'prevText')){ b.textContent = b.dataset.prevText; delete b.dataset.prevText; } }catch{} });
+                        resolve();
+                    }
+                }, 200);
+            });
+        }
+        // Expose save globally so welding toolbar forwarding can call it
+        window.save = save;
+        (function(){
+            const standaloneBtn = document.getElementById('btnSave');
+            const hostBtn = document.getElementById('saveAllBtn');
+            standaloneBtn?.addEventListener('click', (e)=>{ e.preventDefault(); save(); });
+            hostBtn?.addEventListener('click', (e)=>{ e.preventDefault(); save(); });
+        })();
+        // Formatting helpers (sticky/frozen + bottom scroll sync) adapted from DailyFitup
+        (function(){
+            // Prevent double initialization if fragment is injected multiple times
+            const frag = document.getElementById('dwr-table-fragment');
+            if(frag && frag.dataset.init==='1') return;
+            if(frag) frag.dataset.init='1';
+
+            function resizeBottomScroll(){
+                const inner=document.getElementById('bottomScrollInner');
+                const table=document.getElementById('fitupTable');
+                const bottom=document.getElementById('bottomScroll');
+                if(inner && table){ inner.style.width = table.scrollWidth + 'px'; }
+                if(bottom){ const max = bottom.scrollWidth - bottom.clientWidth; if(bottom.scrollLeft > max){ bottom.scrollLeft = Math.max(0,max); } }
+            }
+            function bindScrollSync(){
+                const bottom=document.getElementById('bottomScroll');
+                const wrapper=document.getElementById('tableWrapper');
+                if(!bottom||!wrapper||bottom.dataset.bound) return;
+                bottom.addEventListener('scroll',()=>{ wrapper.scrollLeft = bottom.scrollLeft; });
+                wrapper.addEventListener('scroll',()=>{ bottom.scrollLeft = wrapper.scrollLeft; });
+                bottom.dataset.bound='1';
+            }
+            let frozenMeta=[];
+            function computeFrozenLefts(){
+                frozenMeta=[]; const table=document.getElementById('fitupTable'); if(!table) return; const row=table.querySelector('thead tr'); if(!row) return; const frozenCells=[...row.querySelectorAll('[data-frozen="1"], .frozen-col')]; let left=0; frozenCells.forEach(c=>{ const w=c.getBoundingClientRect().width; frozenMeta.push({el:c,left}); left+=w; }); applyFrozenPositions();
+            }
+            function applyFrozenPositions(){ const table=document.getElementById('fitupTable'); if(!table) return; frozenMeta.forEach(m=>{ const cls=[...m.el.classList].find(x=>x.startsWith('col-')); if(!cls) return; table.querySelectorAll('th.'+cls+', td.'+cls).forEach(cell=>{ cell.style.left=m.left+'px'; cell.style.position='sticky'; }); }); }
+            function markFrozen(){ const table=document.getElementById('fitupTable'); if(!table) return; const classes=['col-sn','col-layout','col-locjoint','col-wtype']; classes.forEach(cls=>{ table.querySelectorAll('th.'+cls+', td.'+cls).forEach(cell=>{ cell.dataset.frozen='1'; cell.classList.add('frozen-col'); }); }); computeFrozenLefts(); }
+            function init(){ markFrozen(); bindScrollSync(); resizeBottomScroll(); window.addEventListener('resize', resizeBottomScroll); }
+            if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
+
+            // Keep bottom scroll width in sync when table content changes
+            try {
+                const tableInner = document.getElementById('tableInner');
+                if(tableInner && !tableInner.dataset.observing){
+                    const mo = new MutationObserver(()=>{ resizeBottomScroll(); });
+                    mo.observe(tableInner, { childList: true, subtree: true });
+                    tableInner.dataset.observing = '1';
+                }
+            } catch {}
+        })();
+        // Fallback: ensure per-row "Open DWG" buttons work even if external DWG script isn't initialized
+        (function(){
+            if(window.__dwrRowDwgBound==='1') return;
+            window.__dwrRowDwgBound='1';
+            function safeStatus(msg, ok){ try{ if(typeof window.showStatus==='function') window.showStatus(msg, ok); else if(msg) console[(ok?'log':'warn')](msg); }catch{} }
+            document.addEventListener('click', function(e){
+                const btn = e.target && e.target.closest && e.target.closest('.open-dwg-row');
+                if(!btn) return;
+                e.preventDefault();
+                try{
+                    const pid = (document.getElementById('projectSelect')?.value || '').trim();
+                    if(!pid){ safeStatus('Select Project first', false); return; }
+                    const tr = btn.closest('tr');
+                    const layout = (btn.dataset.layout || tr?.querySelector('.col-layout')?.textContent || '').trim();
+                    let sheet = (btn.dataset.sheet || '').trim();
+                    if(!sheet && tr){
+                        const sheetInp = tr.querySelector('input[data-name="Sheet"], select[data-name="Sheet"]');
+                        sheet = (sheetInp?.value || sheetInp?.textContent || tr.querySelector('.col-sheet')?.textContent || '').trim();
+                    }
+                    if(!layout){ safeStatus('Layout missing for this row', false); return; }
+                    const url = '/Home/OpenLatestDrawing?projectId=' + encodeURIComponent(pid) + '&layout=' + encodeURIComponent(layout) + (sheet?('&sheet=' + encodeURIComponent(sheet)):'');
+                    const w = window.open(url, '_blank');
+                    if(!w) window.location.href = url;
+                }catch(err){ console.debug('Open DWG fallback error', err); }
+            });
+        })();
+     </script>
+
+    </div> <!-- end #dwr-table-fragment -->
+
+    @await Html.PartialAsync("~/Views/Shared/_DashboardFooter.cshtml")
+
+</body>
+</html>

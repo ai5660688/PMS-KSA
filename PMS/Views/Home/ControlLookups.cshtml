@@ -1,0 +1,715 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+    ViewData["Title"] = "Control Lookups";
+    var ipTList = ViewBag.IpTList as IEnumerable<PMS.Models.PmsIpT> ?? Enumerable.Empty<PMS.Models.PmsIpT>();
+    var jAddList = ViewBag.JAddList as IEnumerable<PMS.Models.PmsJAdd> ?? Enumerable.Empty<PMS.Models.PmsJAdd>();
+    var locationList = ViewBag.LocationList as IEnumerable<PMS.Models.PmsLocation> ?? Enumerable.Empty<PMS.Models.PmsLocation>();
+    var weldTypeList = ViewBag.WeldTypeList as IEnumerable<PMS.Models.PmsWeldType> ?? Enumerable.Empty<PMS.Models.PmsWeldType>();
+    var projectNo = (int)(ViewBag.ProjectNo ?? 0);
+    var projects = ViewBag.Projects as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>PMS - Control Lookups</title>
+    <link rel="icon" type="image/png" href="~/img/title_logo.png">
+    <link rel="stylesheet" href="~/css/DashboardStyle.css" asp-append-version="true">
+    <style>
+        .page { width:92%; margin:20px auto; background:#fff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,.1); padding:20px; }
+        .page-title { color:#176d8a; font-size:2em; margin:0 0 16px 0; padding-bottom:10px; border-bottom:2px solid #e6f6fa; }
+        .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+        .form-group { display:flex; flex-direction:column; gap:6px; }
+        label { font-weight:600; color:#176d8a; font-size:.9rem; }
+        .form-control { padding:8px 12px; border:1px solid #cce7ef; border-radius:4px; background:#fff; color:#176d8a; font-size:.9rem; width:100%; box-sizing:border-box; }
+        .form-control:focus { outline:none; border-color:#1f99be; box-shadow:0 0 0 2px rgba(31,153,190,.2); }
+        .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+        .btn { padding:8px 14px; border:none; border-radius:4px; cursor:pointer; font-weight:600; transition:.2s; }
+        .btn-primary { background:#1f99be; color:#fff; } .btn-primary:hover{ background:#176d8a; }
+        .btn-danger { background:#cc0000; color:#fff; } .btn-danger:hover{ background:#a30000; }
+        .btn-secondary { background:#7a9aa8; color:#fff; }
+        .btn-outline { background:#fff; color:#176d8a; border:1px solid #1f99be; }
+        .btn-outline:hover { background:#1f99be; color:#fff; }
+        .user-table { width:100%; border-collapse:collapse; margin-top:12px; }
+        .user-table th { background-color:#e6f6fa; color:#176d8a; padding:10px 12px; text-align:left; position:sticky; top:0; }
+        .user-table td { padding:10px 12px; border-bottom:1px solid #e6f6fa; color:#1a6d86; }
+        .user-table th, .user-table td { font-size:.9rem; }
+        .msg { margin:0 0 12px 0; font-weight:400; font-size:0.875rem; display:block; }
+        .msg.text-danger { color: #cc0000; }
+        .msg-success { color: #27ae60; font-weight:400; font-size:0.875rem; display:block; }
+        .row-actions { display:flex; gap:8px; }
+
+        /* ── Tabs ── */
+        .tabs { display:flex; gap:0; margin-bottom:0; border-bottom:2px solid #e6f6fa; }
+        .tab-btn { padding:10px 20px; cursor:pointer; background:none; border:none; font-weight:600; font-size:1rem;
+                   color:#7a9aa8; border-bottom:3px solid transparent; transition:.2s; }
+        .tab-btn:hover { color:#176d8a; }
+        .tab-btn.active { color:#176d8a; border-bottom-color:#1f99be; }
+        .tab-panel { display:none; padding-top:16px; }
+        .tab-panel.active { display:block; }
+
+        /* ── Modal ── */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center; }
+        .modal-content { background:#fff; padding:25px; border-radius:8px; width:90%; max-width:450px; box-shadow:0 4px 20px rgba(0,0,0,0.15); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:15px; border-bottom:1px solid #e6f6fa; }
+        .modal-title { color:#176d8a; font-size:1.2rem; margin:0; }
+        .close-modal { background:none; border:none; font-size:1.5rem; cursor:pointer; color:#176d8a; }
+        .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid #e6f6fa; }
+
+        .table-wrap { max-height:55vh; overflow:auto; }
+        .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+        .filter-bar input { flex:1 1 260px; }
+        .count { font-size:.8rem; color:#176d8a; }
+        .search { padding:6px 10px; border:1px solid #cce7ef; border-radius:4px; color:#176d8a; font-size:.9rem; }
+
+        /* ── Project selector toolbar ── */
+        .project-bar { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+        .project-bar label { margin:0; white-space:nowrap; font-weight:600; color:#176d8a; }
+        .project-bar select { min-width:350px; }
+        .w350 { width:350px; max-width:100%; }
+
+        /* ── Searchable select dropdown widget (matches Welder Register) ── */
+        .ss-wrap { position:relative; display:inline-block; vertical-align:middle; }
+        .ss-wrap.w350 { width:350px; min-width:350px; }
+        .ss-input { width:100%; box-sizing:border-box; cursor:pointer; padding:6px 10px; border:1px solid #cce7ef; border-radius:4px; background:#fff; color:#176d8a; font-family:inherit; font-size:.95rem; line-height:1.4; }
+        .ss-input:focus { cursor:text; outline:none; border-color:#1f99be; box-shadow:0 0 2px rgba(31,153,190,.2); }
+        .ss-list { display:none; position:absolute; left:0; right:0; top:100%; z-index:200; background:#fff; border:1px solid #1f99be; border-top:none; border-radius:0 0 6px 6px; max-height:220px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,.12); }
+        .ss-item { padding:6px 10px; cursor:pointer; font-size:.9rem; color:#176d8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ss-item:hover, .ss-item.ss-highlight { background:#e6f6fa; }
+        .ss-item.ss-active { font-weight:700; }
+        .ss-empty { padding:6px 10px; font-size:.85rem; color:#999; font-style:italic; }
+        .ss-open .ss-input { border-radius:4px 4px 0 0; border-color:#1f99be; }
+        .ss-list::-webkit-scrollbar { width:10px; }
+        .ss-list::-webkit-scrollbar-track { background:#f0fbff; border-radius:8px; }
+        .ss-list::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; border:2px solid #f0fbff; }
+        .ss-list::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+        .ss-list { scrollbar-width:thin; scrollbar-color:#176d8a #f0fbff; }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_DashboardHeader")
+
+    <div class="page">
+        <h1 class="page-title">Control Lookups</h1>
+
+        @if (TempData["Msg"] is string m)
+        {
+            var isSuccess = System.Text.RegularExpressions.Regex.IsMatch(m ?? "", "(successfully|saved|deleted|added)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var css = isSuccess ? "msg msg-success" : "msg text-danger";
+            <div class="@css" role="status" aria-live="polite">@m</div>
+        }
+
+        <!-- ═══ Toolbar (matches Welder Register) ═══ -->
+        <div class="project-bar">
+            <label for="projectSelect">Project No:</label>
+            <select id="projectSelect" class="search w350" title="Project No">
+                @foreach (var p in projects)
+                {
+                    if ((int)p.Value == projectNo)
+                    {
+                        <option value="@p.Value" selected>@p.Text</option>
+                    }
+                    else
+                    {
+                        <option value="@p.Value">@p.Text</option>
+                    }
+                }
+            </select>
+            <input id="globalSearch" class="search" placeholder="Search (all columns)" autocomplete="off" />
+            <button type="button" class="btn btn-outline" onclick="openCopyModal()">Copy to Project</button>
+        </div>
+
+        <!-- ═══ Tabs ═══ -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="tabIpT">IP/T Type</button>
+            <button class="tab-btn" data-tab="tabJAdd">Joint Addition</button>
+            <button class="tab-btn" data-tab="tabLocation">Location</button>
+            <button class="tab-btn" data-tab="tabWeldType">Weld Type</button>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 1 – IP/T Type  (PMS_IP_T_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabIpT" class="tab-panel active">
+            <form asp-action="SaveIpT" asp-controller="Home" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="ipt_IP_T_Project_No" name="IP_T_Project_No" value="@projectNo" />
+                <div class="grid">
+                    <div class="form-group">
+                        <label for="ipt_IP_T_ID">ID</label>
+                        <input class="form-control" id="ipt_IP_T_ID" name="IP_T_ID" type="number" placeholder="Auto (leave 0 for new)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="ipt_IP_T_List">IP/T Type</label>
+                        <input class="form-control" id="ipt_IP_T_List" name="IP_T_List" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="ipt_P_IP_T_List">Project IP/T Type</label>
+                        <input class="form-control" id="ipt_P_IP_T_List" name="P_IP_T_List" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="ipt_IP_T_Notes">Notes</label>
+                        <input class="form-control" id="ipt_IP_T_Notes" name="IP_T_Notes" maxlength="100" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-secondary" onclick="clearForm('ipt_')">Clear</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+
+            <div class="table-wrap">
+                <table class="user-table" id="tblIpT">
+                    <thead><tr><th>ID</th><th>IP/T Type</th><th>Project IP/T Type</th><th>Notes</th><th>Project No</th><th>Actions</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in ipTList)
+                    {
+                        <tr data-id="@r.IP_T_ID">
+                            <td>@r.IP_T_ID</td>
+                            <td>@r.IP_T_List</td>
+                            <td>@r.P_IP_T_List</td>
+                            <td>@r.IP_T_Notes</td>
+                            <td>@r.IP_T_Project_No</td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-primary" onclick="editIpT(this)">Edit</button>
+                                    <form asp-action="DeleteIpT" asp-controller="Home" method="post" class="delete-form" data-name="IP/T Type @r.IP_T_List">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@r.IP_T_ID" />
+                                        <button type="submit" class="btn btn-danger">Del</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 2 – Joint Addition  (PMS_J_Add_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabJAdd" class="tab-panel">
+            <form asp-action="SaveJAdd" asp-controller="Home" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="jadd_Add_Project_No" name="Add_Project_No" value="@projectNo" />
+                <div class="grid">
+                    <div class="form-group">
+                        <label for="jadd_Add_ID">ID</label>
+                        <input class="form-control" id="jadd_Add_ID" name="Add_ID" type="number" placeholder="Auto (leave 0 for new)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="jadd_Add_J_Add">Joint Addition</label>
+                        <input class="form-control" id="jadd_Add_J_Add" name="Add_J_Add" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="jadd_P_J_Add">Project Joint Addition</label>
+                        <input class="form-control" id="jadd_P_J_Add" name="P_J_Add" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="jadd_Add_Notes">Notes</label>
+                        <input class="form-control" id="jadd_Add_Notes" name="Add_Notes" maxlength="100" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-secondary" onclick="clearForm('jadd_')">Clear</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+
+            <div class="table-wrap">
+                <table class="user-table" id="tblJAdd">
+                    <thead><tr><th>ID</th><th>Joint Addition</th><th>Project Joint Addition</th><th>Notes</th><th>Project
+                    <tbody>
+                    @foreach (var r in jAddList)
+                    {
+                        <tr data-id="@r.Add_ID">
+                            <td>@r.Add_ID</td>
+                            <td>@r.Add_J_Add</td>
+                            <td>@r.P_J_Add</td>
+                            <td>@r.Add_Notes</td>
+                            <td>@r.Add_Project_No</td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-primary" onclick="editJAdd(this)">Edit</button>
+                                    <form asp-action="DeleteJAdd" asp-controller="Home" method="post" class="delete-form" data-name="Joint Addition @r.Add_J_Add">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@r.Add_ID" />
+                                        <button type="submit" class="btn btn-danger">Del</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 3 – Location  (PMS_Location_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabLocation" class="tab-panel">
+            <form asp-action="SaveLocation" asp-controller="Home" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="loc_LO_Project_No" name="LO_Project_No" value="@projectNo" />
+                <div class="grid">
+                    <div class="form-group">
+                        <label for="loc_LO_ID">ID</label>
+                        <input class="form-control" id="loc_LO_ID" name="LO_ID" type="number" placeholder="Auto (leave 0 for new)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="loc_LO_Location">Location</label>
+                        <input class="form-control" id="loc_LO_Location" name="LO_Location" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="loc_P_Location">Project Location</label>
+                        <input class="form-control" id="loc_P_Location" name="P_Location" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="loc_LO_Notes">Notes</label>
+                        <input class="form-control" id="loc_LO_Notes" name="LO_Notes" maxlength="100" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-secondary" onclick="clearForm('loc_')">Clear</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+
+            <div class="table-wrap">
+                <table class="user-table" id="tblLocation">
+                    <thead><tr><th>ID</th><th>Location</th><th>Project Location</th><th>Notes</th><th>Project No</th><th>Actions</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in locationList)
+                    {
+                        <tr data-id="@r.LO_ID">
+                            <td>@r.LO_ID</td>
+                            <td>@r.LO_Location</td>
+                            <td>@r.P_Location</td>
+                            <td>@r.LO_Notes</td>
+                            <td>@r.LO_Project_No</td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-primary" onclick="editLocation(this)">Edit</button>
+                                    <form asp-action="DeleteLocation" asp-controller="Home" method="post" class="delete-form" data-name="Location @r.LO_Location">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@r.LO_ID" />
+                                        <button type="submit" class="btn btn-danger">Del</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════
+             TAB 4 – Weld Type  (PMS_Weld_Type_tbl)
+             ═══════════════════════════════════════════════════════ -->
+        <div id="tabWeldType" class="tab-panel">
+            <form asp-action="SaveWeldType" asp-controller="Home" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="wt_W_Project_No" name="W_Project_No" value="@projectNo" />
+                <div class="grid">
+                    <div class="form-group">
+                        <label for="wt_W_Type_ID">ID</label>
+                        <input class="form-control" id="wt_W_Type_ID" name="W_Type_ID" type="number" placeholder="Auto (leave 0 for new)" />
+                    </div>
+                    <div class="form-group">
+                        <label for="wt_W_Weld_Type">Weld Type</label>
+                        <input class="form-control" id="wt_W_Weld_Type" name="W_Weld_Type" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="wt_P_Weld_Type">Project Weld Type</label>
+                        <input class="form-control" id="wt_P_Weld_Type" name="P_Weld_Type" maxlength="8" />
+                    </div>
+                    <div class="form-group">
+                        <label for="wt_Default_Value">Default Value</label>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="wt_Default_Value" name="Default_Value" value="true" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="wt_PROG_Default_Value">PROG Default</label>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="wt_PROG_Default_Value" name="PROG_Default_Value" value="true" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="wt_W_Notes">Notes</label>
+                        <input class="form-control" id="wt_W_Notes" name="W_Notes" maxlength="100" />
+                    </div>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-secondary" onclick="clearForm('wt_')">Clear</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+
+            <div class="table-wrap">
+                <table class="user-table" id="tblWeldType">
+                    <thead><tr><th>ID</th><th>Weld Type</th><th>Project Weld Type</th><th>Default</th><th>PROG Default</th><th>Notes</th><th>Project
+                    <tbody>
+                    @foreach (var r in weldTypeList)
+                    {
+                        <tr data-id="@r.W_Type_ID">
+                            <td>@r.W_Type_ID</td>
+                            <td>@r.W_Weld_Type</td>
+                            <td>@r.P_Weld_Type</td>
+                            <td>@(r.Default_Value ? "Yes" : "No")</td>
+                            <td>@(r.PROG_Default_Value ? "Yes" : "No")</td>
+                            <td>@r.W_Notes</td>
+                            <td>@r.W_Project_No</td>
+                            <td>
+                                <div class="row-actions">
+                                    <button type="button" class="btn btn-primary" onclick="editWeldType(this)">Edit</button>
+                                    <form asp-action="DeleteWeldType" asp-controller="Home" method="post" class="delete-form" data-name="Weld Type @r.W_Weld_Type">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@r.W_Type_ID" />
+                                        <button type="submit" class="btn btn-danger">Del</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Delete Confirmation Modal ═══ -->
+    <div class="modal" id="confirmDeleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Confirm Delete</h2>
+                <button class="close-modal" type="button" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p id="confirmDeleteMessage" style="color:#176d8a; margin:0 0 16px 0;"></p>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Copy to Project Modal ═══ -->
+    <div class="modal" id="copyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Copy All Rows to Another Project</h2>
+                <button class="close-modal" type="button" onclick="closeCopyModal()">&times;</button>
+            </div>
+            <p style="color:#176d8a; margin:0 0 12px 0;">
+                (IP/T Type, Joint Addition, Location, Weld Type)
+                from the current project to the selected target project.
+            </p>
+            <form asp-action="CopyLookupsToProject" asp-controller="Home" method="post" id="copyForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="sourceProjectNo" value="@projectNo" />
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label for="targetProjectSelect">Target Project:</label>
+                    <select id="targetProjectSelect" name="targetProjectNo" class="search w350" title="Target Project" required>
+                        <option value="">-- Select target --</option>
+                        @foreach (var p in projects)
+                        {
+                            if ((int)p.Value != projectNo)
+                            {
+                                <option value="@p.Value">@p.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn" onclick="closeCopyModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Copy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_DashboardFooter")
+
+    <script>
+        function byId(id) { return document.getElementById(id); }
+
+        // ══════════════════════════════════════════════════════════
+        //  Searchable select widget (same as Welder Register)
+        // ══════════════════════════════════════════════════════════
+        function makeSearchableSelect(sel) {
+            if (!sel || sel.dataset.searchable) return;
+            sel.dataset.searchable = '1';
+            sel.style.display = 'none';
+            var wrap = document.createElement('div');
+            wrap.className = 'ss-wrap';
+            if (sel.classList.contains('w350')) wrap.classList.add('w350');
+            sel.parentNode.insertBefore(wrap, sel);
+            wrap.appendChild(sel);
+
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'ss-input';
+            input.setAttribute('autocomplete', 'off');
+            input.setAttribute('spellcheck', 'false');
+            input.placeholder = 'Search project...';
+            wrap.appendChild(input);
+
+            var list = document.createElement('div');
+            list.className = 'ss-list';
+            wrap.appendChild(list);
+
+            var items = [];
+            var highlighted = -1;
+            var open = false;
+
+            function buildItems() {
+                items = [];
+                Array.from(sel.options).forEach(function (opt) {
+                    items.push({ value: opt.value, text: opt.text || opt.value });
+                });
+            }
+            function syncInputText() {
+                var idx = sel.selectedIndex;
+                input.value = idx >= 0 && sel.options[idx] ? (sel.options[idx].text || sel.options[idx].value) : '';
+            }
+            function render(filter) {
+                list.innerHTML = '';
+                highlighted = -1;
+                var lc = (filter || '').toLowerCase();
+                var count = 0;
+                items.forEach(function (item, i) {
+                    if (lc && !(item.text || '').toLowerCase().includes(lc)) return;
+                    var div = document.createElement('div');
+                    div.className = 'ss-item';
+                    div.textContent = item.text;
+                    div.dataset.idx = String(i);
+                    if (item.value === sel.value) div.classList.add('ss-active');
+                    div.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        pick(i);
+                    });
+                    list.appendChild(div);
+                    count++;
+                });
+                if (count === 0) {
+                    var empty = document.createElement('div');
+                    empty.className = 'ss-empty';
+                    empty.textContent = 'No match';
+                    list.appendChild(empty);
+                }
+            }
+            function pick(idx) {
+                if (idx < 0 || idx >= items.length) return;
+                sel.value = items[idx].value;
+                syncInputText();
+                closeList();
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            function showList() {
+                if (open) return;
+                open = true;
+                render(input.value !== (items[sel.selectedIndex]?.text || '') ? input.value : '');
+                list.style.display = 'block';
+                wrap.classList.add('ss-open');
+            }
+            function closeList() {
+                open = false;
+                list.style.display = 'none';
+                wrap.classList.remove('ss-open');
+                highlighted = -1;
+            }
+            function highlightItem(dir) {
+                var visible = list.querySelectorAll('.ss-item');
+                if (!visible.length) return;
+                if (dir === 'down') highlighted = highlighted < visible.length - 1 ? highlighted + 1 : 0;
+                else highlighted = highlighted > 0 ? highlighted - 1 : visible.length - 1;
+                visible.forEach(function (el, i) { el.classList.toggle('ss-highlight', i === highlighted); });
+                if (visible[highlighted]) visible[highlighted].scrollIntoView({ block: 'nearest' });
+            }
+            input.addEventListener('focus', function () {
+                buildItems();
+                input.select();
+                showList();
+            });
+            input.addEventListener('input', function () {
+                buildItems();
+                showList();
+                render(input.value);
+            });
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (!open) { showList(); render(''); }
+                    highlightItem('down');
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    highlightItem('up');
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (open && highlighted >= 0) {
+                        var visible = list.querySelectorAll('.ss-item');
+                        if (visible[highlighted]) {
+                            var idx = parseInt(visible[highlighted].dataset.idx, 10);
+                            pick(idx);
+                        }
+                    }
+                } else if (e.key === 'Escape') {
+                    syncInputText();
+                    closeList();
+                    input.blur();
+                } else if (e.key === 'Tab') {
+                    syncInputText();
+                    closeList();
+                }
+            });
+            input.addEventListener('blur', function () {
+                setTimeout(function () {
+                    if (!wrap.contains(document.activeElement)) {
+                        syncInputText();
+                        closeList();
+                    }
+                }, 150);
+            });
+            buildItems();
+            syncInputText();
+        }
+
+        // ══════════════════════════════════════════════════════════
+        //  Project dropdown → searchable + reload on change
+        // ══════════════════════════════════════════════════════════
+        var projectSelect = byId('projectSelect');
+        makeSearchableSelect(projectSelect);
+        projectSelect.addEventListener('change', function () {
+            var val = (projectSelect.value || '').trim();
+            var url = new URL(window.location.href);
+            if (val) url.searchParams.set('projectNo', val); else url.searchParams.delete('projectNo');
+            window.location.href = url.toString();
+        });
+
+        // ══════════════════════════════════════════════════════════
+        //  Tabs
+        // ══════════════════════════════════════════════════════════
+        document.querySelectorAll('.tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+                document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+                btn.classList.add('active');
+                byId(btn.dataset.tab).classList.add('active');
+                applyGlobalSearch(); // re-apply filter when switching tabs
+            });
+        });
+
+        // ══════════════════════════════════════════════════════════
+        //  Global search (filters active tab's table)
+        // ══════════════════════════════════════════════════════════
+        var globalSearchInput = byId('globalSearch');
+        function applyGlobalSearch() {
+            var q = (globalSearchInput.value || '').trim().toLowerCase();
+            var activePanel = document.querySelector('.tab-panel.active');
+            if (!activePanel) return;
+            var tbl = activePanel.querySelector('.user-table');
+            if (!tbl) return;
+            tbl.querySelectorAll('tbody tr').forEach(function (tr) {
+                var text = tr.textContent.toLowerCase();
+                tr.style.display = (!q || text.indexOf(q) >= 0) ? '' : 'none';
+            });
+        }
+        function debounce(fn, ms) { var h; return function () { clearTimeout(h); h = setTimeout(fn, ms || 120); }; }
+        globalSearchInput.addEventListener('input', debounce(applyGlobalSearch, 120));
+        applyGlobalSearch();
+
+        // ══════════════════════════════════════════════════════════
+        //  Clear form
+        // ══════════════════════════════════════════════════════════
+        function clearForm(prefix) {
+            document.querySelectorAll('[id^="' + prefix + '"]').forEach(function (el) {
+                if (el.type === 'hidden') return;
+                if (el.type === 'checkbox') el.checked = false;
+                else el.value = '';
+            });
+        }
+
+        // ══════════════════════════════════════════════════════════
+        //  Edit helpers
+        // ══════════════════════════════════════════════════════════
+        function editIpT(btn) {
+            var tr = btn.closest('tr'), td = tr.children;
+            byId('ipt_IP_T_ID').value = td[0].textContent.trim();
+            byId('ipt_IP_T_List').value = td[1].textContent.trim();
+            byId('ipt_P_IP_T_List').value = td[2].textContent.trim();
+            byId('ipt_IP_T_Notes').value = td[3].textContent.trim();
+            byId('ipt_IP_T_Project_No').value = td[4].textContent.trim();
+            scrollToTop();
+        }
+        function editJAdd(btn) {
+            var tr = btn.closest('tr'), td = tr.children;
+            byId('jadd_Add_ID').value = td[0].textContent.trim();
+            byId('jadd_Add_J_Add').value = td[1].textContent.trim();
+            byId('jadd_P_J_Add').value = td[2].textContent.trim();
+            byId('jadd_Add_Notes').value = td[3].textContent.trim();
+            byId('jadd_Add_Project_No').value = td[4].textContent.trim();
+            scrollToTop();
+        }
+        function editLocation(btn) {
+            var tr = btn.closest('tr'), td = tr.children;
+            byId('loc_LO_ID').value = td[0].textContent.trim();
+            byId('loc_LO_Location').value = td[1].textContent.trim();
+            byId('loc_P_Location').value = td[2].textContent.trim();
+            byId('loc_LO_Notes').value = td[3].textContent.trim();
+            byId('loc_LO_Project_No').value = td[4].textContent.trim();
+            scrollToTop();
+        }
+        function editWeldType(btn) {
+            var tr = btn.closest('tr'), td = tr.children;
+            byId('wt_W_Type_ID').value = td[0].textContent.trim();
+            byId('wt_W_Weld_Type').value = td[1].textContent.trim();
+            byId('wt_P_Weld_Type').value = td[2].textContent.trim();
+            byId('wt_Default_Value').checked = td[3].textContent.trim().toLowerCase() === 'yes';
+            byId('wt_PROG_Default_Value').checked = td[4].textContent.trim().toLowerCase() === 'yes';
+            byId('wt_W_Notes').value = td[5].textContent.trim();
+            byId('wt_W_Project_No').value = td[6].textContent.trim();
+            scrollToTop();
+        }
+        function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+        // ══════════════════════════════════════════════════════════
+        //  Delete confirmation modal
+        // ══════════════════════════════════════════════════════════
+        var pendingDeleteForm = null;
+        function openDeleteModal(form) {
+            pendingDeleteForm = form;
+            var name = form.dataset.name || '';
+            byId('confirmDeleteMessage').textContent = 'Are you sure you want to delete ' + name + '?';
+            byId('confirmDeleteModal').style.display = 'flex';
+        }
+        function closeDeleteModal() { byId('confirmDeleteModal').style.display = 'none'; pendingDeleteForm = null; }
+        function confirmDelete() { if (pendingDeleteForm) pendingDeleteForm.submit(); closeDeleteModal(); }
+        document.querySelectorAll('form.delete-form').forEach(function (f) {
+            f.addEventListener('submit', function (e) { e.preventDefault(); openDeleteModal(this); });
+        });
+        window.addEventListener('click', function (e) { if (e.target === byId('confirmDeleteModal')) closeDeleteModal(); });
+        window.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                var modal = byId('confirmDeleteModal');
+                if (modal && modal.style.display === 'flex') closeDeleteModal();
+                var copyM = byId('copyModal');
+                if (copyM && copyM.style.display === 'flex') closeCopyModal();
+            }
+        });
+
+        // ══════════════════════════════════════════════════════════
+        //  Copy to Project modal
+        // ══════════════════════════════════════════════════════════
+        var targetSelect = byId('targetProjectSelect');
+        makeSearchableSelect(targetSelect);
+        function openCopyModal() { byId('copyModal').style.display = 'flex'; }
+        function closeCopyModal() { byId('copyModal').style.display = 'none'; }
+        window.addEventListener('click', function (e) { if (e.target === byId('copyModal')) closeCopyModal(); });
+    </script>
+</body>
+</html>

@@ -1,0 +1,825 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model List<PMS.Models.NdtPercentageRow>
+@{
+    Layout = "_LayoutDashboard";
+    ViewData["Title"] = "NDT Percentage";
+
+    var layoutNos = ViewBag.LayoutNos as List<string> ?? new();
+    var lineClasses = ViewBag.LineClasses as List<string> ?? new();
+    var materials = ViewBag.Materials as List<string> ?? new();
+    var materialDescs = ViewBag.MaterialDescs as List<string> ?? new();
+    var fluids = ViewBag.Fluids as List<string> ?? new();
+    var designTemps = ViewBag.DesignTemps as List<string> ?? new();
+    var categories = ViewBag.Categories as List<string> ?? new();
+    var projectNos = ViewBag.ProjectNos as List<PMS.Models.ProjectOption> ?? new();
+    var sheetNos = ViewBag.SheetNos as List<string> ?? new();
+    var weldNumbers = ViewBag.WeldNumbers as List<string> ?? new();
+    var selectedProjectIds = new HashSet<int>(ViewBag.SelectedProjectIds as List<int> ?? new());
+    var selLayoutNos = new HashSet<string>(ViewBag.SelectedLayoutNos as List<string> ?? new());
+    var selLineClasses = new HashSet<string>(ViewBag.SelectedLineClasses as List<string> ?? new());
+    var selMaterials = new HashSet<string>(ViewBag.SelectedMaterials as List<string> ?? new());
+    var selMaterialDescs = new HashSet<string>(ViewBag.SelectedMaterialDescs as List<string> ?? new());
+    var selFluids = new HashSet<string>(ViewBag.SelectedFluids as List<string> ?? new());
+    var selDesignTemps = new HashSet<string>(ViewBag.SelectedDesignTemps as List<string> ?? new());
+    var selCategories = new HashSet<string>(ViewBag.SelectedCategories as List<string> ?? new());
+    var selSheetNos = new HashSet<string>(ViewBag.SelectedSheetNos as List<string> ?? new());
+    var selWeldNumbers = new HashSet<string>(ViewBag.SelectedWeldNumbers as List<string> ?? new());
+
+    bool hasFilter = selectedProjectIds.Count > 0
+        || selLayoutNos.Count > 0
+        || selLineClasses.Count > 0
+        || selMaterials.Count > 0
+        || selMaterialDescs.Count > 0
+        || selFluids.Count > 0
+        || selDesignTemps.Count > 0
+        || selCategories.Count > 0
+        || selSheetNos.Count > 0
+        || selWeldNumbers.Count > 0;
+
+    bool showSheet = selSheetNos.Count > 0;
+    bool showWeld = selWeldNumbers.Count > 0;
+    bool showSpecialRt = showSheet || showWeld;
+
+    var msg = TempData["Msg"] as string;
+}
+
+@section Head {
+<style>
+    h1 { color:#176d8a; font-size:1.4rem; line-height:1.2; margin:0 0 20px 0; font-weight:700; letter-spacing:.2px; }
+    .ndt-layout { width:98%; margin:14px auto 0; padding:14px 14px 0; box-sizing:border-box; max-width:1800px; }
+
+    /* Filter panel */
+    .filter-panel { background:#fff; border:1px solid #cce7ef; border-radius:8px; padding:14px 18px; margin-bottom:14px; }
+    .filter-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+    .filter-group { display:flex; flex-direction:column; gap:3px; }
+    .filter-group label { font-size:.8rem; color:#176d8a; font-weight:600; }
+    .filter-group select,
+    .filter-group input[type="text"] {
+        font-family:inherit; font-size:.88rem; color:#176d8a; background:#fff;
+        border:1px solid #cce7ef; border-radius:4px; padding:5px 8px; min-width:130px;
+        transition:border-color .2s;
+    }
+    .filter-group select:focus,
+    .filter-group input[type="text"]:focus { border-color:#176d8a; outline:none; box-shadow:0 0 0 2px rgba(23,109,138,.12); }
+
+    /* Buttons */
+    .btn { padding:7px 14px; border:none; border-radius:5px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:5px; line-height:1; font-size:.88rem; transition:background .2s, color .2s, box-shadow .2s; }
+    a.btn, a.btn:link, a.btn:visited, a.btn:hover, a.btn:focus, a.btn:active { text-decoration:none; }
+    .btn-primary { background:#176d8a; color:#fff; }
+    .btn-primary:hover { background:#125a6e; box-shadow:0 2px 6px rgba(23,109,138,.25); }
+    .btn-outline { background:#fff; color:#176d8a; border:1px solid #1f99be; }
+    .btn-outline:hover { background:#1f99be; color:#fff; }
+    .btn-danger { background:#c0392b; color:#fff; }
+    .btn-danger:hover { background:#a93226; }
+    .btn-success { background:#27ae60; color:#fff; }
+    .btn-success:hover { background:#1e8449; box-shadow:0 2px 6px rgba(39,174,96,.25); }
+
+    /* Table */
+    .table-wrap { overflow:auto; -webkit-overflow-scrolling:touch; max-width:100%; max-height:520px; margin:0; background:#fff; border:1px solid #e6f6fa; border-radius:6px; }
+    .table-wrap::-webkit-scrollbar { height:14px; width:14px; }
+    .table-wrap::-webkit-scrollbar-track { background:#f0fbff; }
+    .table-wrap::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; border:3px solid #fff; }
+    .table-wrap::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+    .table-wrap { scrollbar-width:thin; scrollbar-color:#176d8a #f0fbff; }
+    table { width:100%; border-collapse:collapse; background:#fff; table-layout:fixed; margin:0; }
+    th, td { padding:5px 8px; border:1px solid #e6f6fa; font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
+    th { background:#f0fbff; text-align:center; position:sticky; top:0; z-index:3; color:#176d8a; font-weight:700; }
+    th.group-header { background:#ddf0f6; color:#125a6e; font-size:.76rem; text-transform:uppercase; letter-spacing:.5px; border-bottom:2px solid #176d8a; position:sticky; top:0; z-index:4; }
+    th.col-header { top:26px; z-index:3; }
+    tbody tr:nth-child(even) { background:#f8fcff; }
+    tbody tr:hover { background:#eaf5f9; }
+    .col-serial { width:45px; text-align:center; font-weight:600; }
+    .col-readonly { background:#f7fbfc; color:#444; }
+
+    /* Inline inputs */
+    td input[type="text"], td input[type="number"] {
+        width:100%; box-sizing:border-box; border:1px solid #e6f6fa; border-radius:3px;
+        padding:3px 5px; font-size:.82rem; color:#176d8a; background:#fff; font-family:inherit;
+        transition:border-color .2s; text-align:center;
+    }
+    td input:focus { border-color:#176d8a; outline:none; box-shadow:0 0 0 2px rgba(23,109,138,.1); }
+
+    /* Percentage input wrapper */
+    .pct-wrap { position:relative; display:flex; align-items:center; }
+    td select { width:100%; box-sizing:border-box; border:1px solid #e6f6fa; border-radius:3px; padding:3px 5px; font-size:.82rem; color:#176d8a; background:#fff; transition:border-color .2s; text-align:center; }
+    td select:focus { border-color:#176d8a; outline:none; box-shadow:0 0 0 2px rgba(23,109,138,.1); }
+
+    /* Toolbar */
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .row-count { color:#176d8a; font-weight:600; font-size:.88rem; margin-left:auto; }
+
+    /* Message */
+    .msg-bar { padding:10px 16px; border-radius:6px; background:#e6f6fa; color:#176d8a; font-weight:600; margin-bottom:12px; border-left:4px solid #176d8a; }
+
+    /* Bulk fill panel */
+    .bulk-panel { background:#fff; border:1px solid #e6d9b8; border-radius:8px; padding:14px 18px; margin-bottom:14px; display:none; }
+    .bulk-panel.show { display:block; }
+    .bulk-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:8px; }
+    .bulk-group { display:flex; flex-direction:column; gap:3px; }
+    .bulk-group label { font-size:.78rem; color:#176d8a; font-weight:600; }
+    .bulk-group input, .bulk-group select { font-family:inherit; font-size:.85rem; color:#176d8a; background:#fff; border:1px solid #cce7ef; border-radius:4px; padding:4px 7px; min-width:90px; }
+
+    /* Excel upload panel */
+    .upload-panel { background:#fff; border:1px solid #e6d9b8; border-radius:8px; padding:14px 18px; margin-bottom:14px; display:none; }
+    .upload-panel.show { display:block; }
+
+    .section-title { color:#176d8a; font-weight:700; font-size:.95rem; margin-bottom:8px; }
+
+    /* Save bar */
+    .save-bar { margin-top:12px; padding:10px 0; display:flex; justify-content:flex-end; gap:10px; align-items:center; }
+
+    /* Multi-select dropdown */
+    .ms-wrap { position:relative; display:inline-block; vertical-align:middle; min-width:160px; }
+    .ms-wrap-wide { min-width:350px; }
+    .ms-toggle { width:100%; box-sizing:border-box; cursor:pointer; padding:5px 8px; border:1px solid #cce7ef; border-radius:4px; color:#176d8a; font-size:.88rem; font-weight:600; font-family:inherit; background:#fff; display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:30px; }
+    .ms-toggle::after { content:'\25BC'; font-size:.65rem; color:#176d8a; flex-shrink:0; }
+    .ms-open .ms-toggle::after { content:'\25B2'; }
+    .ms-open .ms-toggle { border-radius:4px 4px 0 0; border-color:#176d8a; }
+    .ms-panel { display:none; position:absolute; left:0; right:0; top:100%; z-index:1200; background:#fff; border:1px solid #176d8a; border-top:none; border-radius:0 0 6px 6px; max-height:260px; overflow-y:auto; box-shadow:0 4px 10px rgba(0,0,0,.12); scrollbar-width:thin; scrollbar-color:#176d8a #f0fbff; }
+    .ms-panel::-webkit-scrollbar { width:10px; }
+    .ms-panel::-webkit-scrollbar-track { background:#f0fbff; border-radius:8px; }
+    .ms-panel::-webkit-scrollbar-thumb { background:#176d8a; border-radius:8px; }
+    .ms-panel::-webkit-scrollbar-thumb:hover { background:#125a6e; }
+    .ms-search { width:100%; box-sizing:border-box; padding:6px 10px; border:none; border-bottom:1px solid #e6f6fa; font-size:.85rem; color:#176d8a; outline:none; font-family:inherit; }
+    .ms-actions { display:flex; gap:4px; padding:4px 8px; border-bottom:1px solid #e6f6fa; }
+    .ms-actions button { font-size:.75rem; padding:2px 8px; border-radius:4px; border:1px solid #cce7ef; background:#f0fbff; color:#176d8a; cursor:pointer; font-weight:600; }
+    .ms-actions button:hover { background:#1f99be; color:#fff; border-color:#1f99be; }
+    .ms-option { display:flex; align-items:center; gap:6px; padding:5px 10px; cursor:pointer; font-size:.85rem; color:#176d8a; }
+    .ms-option:hover { background:#e6f6fa; }
+    .ms-option input[type="checkbox"] { accent-color:#1f99be; cursor:pointer; }
+    .ms-option.ms-hidden { display:none; }
+    .ms-no-match { padding:6px 10px; font-size:.85rem; color:#999; font-style:italic; }
+
+    @@media (max-width:900px) {
+        .filter-row { flex-direction:column; align-items:stretch; }
+        .filter-group select, .filter-group input[type="text"] { min-width:100%; }
+        .ms-wrap, .ms-wrap-wide { min-width:100%; }
+        .toolbar { flex-direction:column; align-items:flex-start; }
+        .row-count { margin-left:0; }
+        th, td { font-size:.78rem; padding:4px 5px; }
+        .bulk-row { flex-direction:column; align-items:stretch; }
+    }
+</style>
+}
+
+<div class="ndt-layout">
+    <h1>NDT Percentage</h1>
+
+    @if (!string.IsNullOrWhiteSpace(msg))
+    {
+        <div class="msg-bar">@msg</div>
+    }
+
+    <!-- ── FILTER PANEL ────────────────────────────── -->
+    <div class="filter-panel">
+        <form method="get" asp-action="NdtPercentage" asp-controller="Home">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Project No</label>
+                    <div class="ms-wrap ms-wrap-wide" data-ms-placeholder="Select projects...">
+                        <div class="ms-toggle" tabindex="0">
+                            <span class="ms-label">Select projects...</span>
+                        </div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search projects..." />
+                            <div class="ms-actions">
+                                <button type="button" data-action="all">All</button>
+                                <button type="button" data-action="none">None</button>
+                            </div>
+                            <div class="ms-options">
+                                @foreach (var p in projectNos)
+                                {
+                                    var isChecked = selectedProjectIds.Contains(p.Id);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="projectNo" value="@p.Id" @(isChecked ? "checked" : "") />
+                                        @p.Id - @p.Name
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Line Class</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select line class...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select line class...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in lineClasses)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="lineClass" value="@v" @(selLineClasses.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Material</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select material...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select material...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in materials)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="material" value="@v" @(selMaterials.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Material Des</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select material des...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select material des...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in materialDescs)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="materialDes" value="@v" @(selMaterialDescs.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Fluid</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select fluid...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select fluid...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in fluids)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="fluid" value="@v" @(selFluids.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Design Temp</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select design temp...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select design temp...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in designTemps)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="designTemp" value="@v" @(selDesignTemps.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Category</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select category...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select category...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in categories)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="category" value="@v" @(selCategories.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Layout No</label>
+                    <div class="ms-wrap" data-ms-placeholder="Select layout...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select layout...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in layoutNos)
+                                {
+                                    <label class="ms-option"><input type="checkbox" name="layoutNo" value="@v" @(selLayoutNos.Contains(v) ? "checked" : "") /> @v</label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sheet No (cascading from Project + Layout) -->
+                <div class="filter-group">
+                    <label>Sheet No</label>
+                    <div class="ms-wrap" id="msSheet" data-ms-placeholder="Select sheet...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select sheet...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in sheetNos)
+                                {
+                                    var isChecked = selSheetNos.Contains(v);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="sheetNo" value="@v" @(isChecked ? "checked" : "") />
+                                        @v
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weld Number (cascading from Project + Layout + Sheet) -->
+                <div class="filter-group">
+                    <label>Weld Number</label>
+                    <div class="ms-wrap" id="msWeld" data-ms-placeholder="Select weld...">
+                        <div class="ms-toggle" tabindex="0"><span class="ms-label">Select weld...</span></div>
+                        <div class="ms-panel">
+                            <input type="text" class="ms-search" placeholder="Search..." />
+                            <div class="ms-actions"><button type="button" data-action="all">All</button><button type="button" data-action="none">None</button></div>
+                            <div class="ms-options">
+                                @foreach (var v in weldNumbers)
+                                {
+                                    var isChecked = selWeldNumbers.Contains(v);
+                                    <label class="ms-option">
+                                        <input type="checkbox" name="weldNumber" value="@v" @(isChecked ? "checked" : "") />
+                                        @v
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filter-group" style="justify-content:flex-end;">
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                </div>
+                @if (hasFilter)
+                {
+                    <div class="filter-group" style="justify-content:flex-end;">
+                        <a asp-action="NdtPercentage" asp-controller="Home" class="btn btn-outline">Clear</a>
+                    </div>
+                }
+            </div>
+        </form>
+    </div>
+
+    @if (hasFilter && Model.Count > 0)
+    {
+        <!-- ── TOOLBAR ──────────────────────────────── -->
+        <div class="toolbar">
+            <button type="button" class="btn btn-outline" onclick="togglePanel('bulkPanel')">&#9998; Bulk Fill</button>
+            <button type="button" class="btn btn-outline" onclick="togglePanel('uploadPanel')">&#8682; Upload Excel</button>
+            @{
+                var exportParams = new List<string>();
+                foreach (var id in selectedProjectIds) { exportParams.Add("projectNo=" + id); }
+                foreach (var v in selLayoutNos) { exportParams.Add("layoutNo=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selLineClasses) { exportParams.Add("lineClass=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selMaterials) { exportParams.Add("material=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selMaterialDescs) { exportParams.Add("materialDes=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selFluids) { exportParams.Add("fluid=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selDesignTemps) { exportParams.Add("designTemp=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selCategories) { exportParams.Add("category=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selSheetNos) { exportParams.Add("sheetNo=" + Uri.EscapeDataString(v)); }
+                foreach (var v in selWeldNumbers) { exportParams.Add("weldNumber=" + Uri.EscapeDataString(v)); }
+            }
+            <a class="btn btn-outline"
+               href="/Home/ExportNdtPercentage?@(string.Join("&", exportParams))">
+                &#8615; Export Excel
+            </a>
+            <span class="row-count">@Model.Count row(s)</span>
+        </div>
+
+        <!-- ── BULK FILL PANEL ──────────────────────── -->
+        <div id="bulkPanel" class="bulk-panel">
+            <div class="section-title">Bulk Fill — apply values to all @Model.Count filtered rows (only non-empty fields are applied)</div>
+            <form method="post" asp-action="BulkFillNdtPercentage" asp-controller="Home">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="bulkIds" value="@string.Join(",", Model.Select(r => r.LineId).Distinct())" />
+                <input type="hidden" name="bulkJointIds" value="@(showSpecialRt ? string.Join(",", Model.Where(r => r.JointId.HasValue).Select(r => r.JointId!.Value).Distinct()) : "")" />
+                <div class="bulk-row">
+                    <div class="bulk-group"><label>Material Des</label><input type="text" name="bfMaterialDes" /></div>
+                    <div class="bulk-group"><label>Material</label><input type="text" name="bfMaterial" /></div>
+                    <div class="bulk-group"><label>Design Temp</label><input type="text" name="bfDesignTemp" /></div>
+                    <div class="bulk-group"><label>Category</label><input type="text" name="bfCategory" /></div>
+                    <div class="bulk-group"><label>RT Shop</label><input type="text" inputmode="decimal" class="pct-field" name="bfRtShop" /></div>
+                    <div class="bulk-group"><label>RT Field</label><input type="text" inputmode="decimal" class="pct-field" name="bfRtField" /></div>
+                    <div class="bulk-group"><label>RT Field/Shop SW</label><input type="text" inputmode="decimal" class="pct-field" name="bfRtFieldShopSw" /></div>
+                    <div class="bulk-group"><label>MT Shop</label><input type="text" inputmode="decimal" class="pct-field" name="bfMtShop" /></div>
+                    <div class="bulk-group"><label>MT Field</label><input type="text" inputmode="decimal" class="pct-field" name="bfMtField" /></div>
+                    <div class="bulk-group"><label>PT Shop</label><input type="text" inputmode="decimal" class="pct-field" name="bfPtShop" /></div>
+                    <div class="bulk-group"><label>PT Field</label><input type="text" inputmode="decimal" class="pct-field" name="bfPtField" /></div>
+                    <div class="bulk-group">
+                        <label>PWHT Y/N</label>
+                        <select name="bfPwhtYn"><option value="">--</option><option value="true">Yes</option><option value="false">No</option></select>
+                    </div>
+                    <div class="bulk-group">
+                        <label>PWHT &gt;20mm</label>
+                        <select name="bfPwht20"><option value="">--</option><option value="true">Yes</option><option value="false">No</option></select>
+                    </div>
+                    <div class="bulk-group"><label>HT</label><input type="text" inputmode="decimal" class="pct-field" name="bfHt" /></div>
+                    <div class="bulk-group"><label>HT After PWHT</label><input type="text" inputmode="decimal" class="pct-field" name="bfHtAfter" /></div>
+                    <div class="bulk-group">
+                        <label>PMI</label>
+                        <select name="bfPmi"><option value="">--</option><option value="true">Yes</option><option value="false">No</option></select>
+                    </div>
+                    <div class="bulk-group"><label>DWG Remarks</label><input type="text" name="bfDwgRemarks" /></div>
+                    @if (showSpecialRt)
+                    {
+                        <div class="bulk-group">
+                            <label>Special Joint</label>
+                            <input type="text" inputmode="decimal" class="pct-field" name="bfSpecialRt" />
+                        </div>
+                    }
+                    <div class="bulk-group" style="justify-content:flex-end;">
+                        <button type="submit" class="btn btn-success">Apply Bulk Fill</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- ── UPLOAD EXCEL PANEL ───────────────────── -->
+        <div id="uploadPanel" class="upload-panel">
+            <div class="section-title">Upload Excel — update rows by Line ID</div>
+            <form method="post" asp-action="ImportNdtPercentage" asp-controller="Home" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" style="font-size:.88rem;" />
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ── EDITABLE TABLE ───────────────────────── -->
+        <form method="post" asp-action="SaveNdtPercentage" asp-controller="Home">
+            @Html.AntiForgeryToken()
+            <div class="table-wrap">
+                <table>
+                    <colgroup>
+                        <col style="width:40px" /><!-- # -->
+                        <col style="width:85px" /><!-- Line Class -->
+                        @if (showSheet)
+                        {
+                            <col style="width:80px" /><!-- Sheet No -->
+                        }
+                        @if (showWeld)
+                        {
+                            <col style="width:130px" /><!-- Weld No -->
+                        }
+                        <col style="width:130px" /><!-- Material Des -->
+                        <col style="width:100px" /><!-- Material -->
+                        <col style="width:80px" /><!-- Fluid -->
+                        <col style="width:115px" /><!-- Design Temp -->
+                        <col style="width:80px" /><!-- Category -->
+                        <col style="width:100px" /><!-- Layout No -->
+                        <col style="width:68px" /><!-- RT Shop -->
+                        <col style="width:68px" /><!-- RT Field -->
+                        <col style="width:115px" /><!-- RT Field/Shop SW -->
+                        @if (showSpecialRt)
+                        {
+                            <col style="width:80px" /><!-- Special Joint -->
+                        }
+                        <col style="width:68px" /><!-- MT Shop -->
+                        <col style="width:68px" /><!-- MT Field -->
+                        <col style="width:68px" /><!-- PT Shop -->
+                        <col style="width:68px" /><!-- PT Field -->
+                        <col style="width:70px" /><!-- PWHT Y/N -->
+                        <col style="width:75px" /><!-- PWHT >20mm -->
+                        <col style="width:62px" /><!-- HT -->
+                        <col style="width:95px" /><!-- HT After PWHT % -->
+                        <col style="width:70px" /><!-- PMI -->
+                        <col style="width:140px" /><!-- DWG Remarks -->
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th class="group-header" colspan="1"></th>
+                            <th class="group-header" colspan="@(1 + (showSheet ? 1 : 0) + (showWeld ? 1 : 0) + 6)">Line Information</th>
+                            <th class="group-header" colspan="@(3 + (showSpecialRt ? 1 : 0))">RT</th>
+                            <th class="group-header" colspan="2">MT</th>
+                            <th class="group-header" colspan="2">PT</th>
+                            <th class="group-header" colspan="2">PWHT</th>
+                            <th class="group-header" colspan="2">HT</th>
+                            <th class="group-header" colspan="1">PMI</th>
+                            <th class="group-header" colspan="1">Remarks</th>
+                        </tr>
+                        <tr>
+                            <th class="col-serial col-header">#</th>
+                            <th class="col-header">Line Class</th>
+                            @if (showSheet)
+                            {
+                                <th class="col-header">Sheet No</th>
+                            }
+                            @if (showWeld)
+                            {
+                                <th class="col-header">Weld No</th>
+                            }
+                            <th class="col-header">Material Des</th>
+                            <th class="col-header">Material</th>
+                            <th class="col-header">Fluid</th>
+                            <th class="col-header">Design Temp (°F)</th>
+                            <th class="col-header">Category</th>
+                            <th class="col-header">Layout No</th>
+                            <th class="col-header">Shop</th>
+                            <th class="col-header">Field</th>
+                            <th class="col-header">Field/Shop SW</th>
+                            @if (showSpecialRt)
+                            {
+                                <th class="col-header">Special Joint</th>
+                            }
+                            <th class="col-header">Shop</th>
+                            <th class="col-header">Field</th>
+                            <th class="col-header">Shop</th>
+                            <th class="col-header">Field</th>
+                            <th class="col-header">Y/N</th>
+                            <th class="col-header">&gt;20mm</th>
+                            <th class="col-header">HT</th>
+                            <th class="col-header">After PWHT</th>
+                            <th class="col-header">PMI</th>
+                            <th class="col-header">DWG Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.Count; i++)
+                        {
+                            var r = Model[i];
+                            <tr>
+                                <td class="col-serial">
+                                    @(i + 1)
+                                    <input type="hidden" name="ids" value="@r.LineId" />
+                                    <input type="hidden" name="jointIds" value="@(showSpecialRt ? (r.JointId ?? 0) : 0)" />
+                                </td>
+                                <td class="col-readonly">@r.LineClass</td>
+                                @if (showSheet)
+                                {
+                                    <td class="col-readonly">@r.SheetNo</td>
+                                }
+                                @if (showWeld)
+                                {
+                                    <td class="col-readonly">@r.WeldNo</td>
+                                }
+                                <td><input type="text" name="materialDesVals" value="@r.MaterialDes" /></td>
+                                <td><input type="text" name="materialVals" value="@r.Material" /></td>
+                                <td class="col-readonly">@r.Fluid</td>
+                                <td><input type="text" name="designTempVals" value="@r.DesignTemp" /></td>
+                                <td><input type="text" name="categoryVals" value="@r.Category" /></td>
+                                <td class="col-readonly">@r.LayoutNo</td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="rtShopVals" value="@r.RtShop" /></div></td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="rtFieldVals" value="@r.RtField" /></div></td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="rtFieldShopSwVals" value="@r.RtFieldShopSw" /></div></td>
+                                @if (showSpecialRt)
+                                {
+                                    <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="specialRtVals" value="@r.SpecialRt" /></div></td>
+                                }
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="mtShopVals" value="@r.MtShop" /></div></td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="mtFieldVals" value="@r.MtField" /></div></td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="ptShopVals" value="@r.PtShop" /></div></td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="ptFieldVals" value="@r.PtField" /></div></td>
+                                <td>
+                                    <select name="pwhtYnVals">
+                                        <option value="">--</option>
+                                        <option value="true" selected="@(r.PwhtYn == true)">Yes</option>
+                                        <option value="false" selected="@(r.PwhtYn == false)">No</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="pwht20Vals">
+                                        <option value="">--</option>
+                                        <option value="true" selected="@(r.Pwht20 == true)">Yes</option>
+                                        <option value="false" selected="@(r.Pwht20 == false)">No</option>
+                                    </select>
+                                </td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="htVals" value="@r.Ht" /></div></td>
+                                <td><div class="pct-wrap"><input type="text" inputmode="decimal" class="pct-field" name="htAfterVals" value="@r.HtAfterPwht" /></div></td>
+                                <td>
+                                    <select name="pmiVals">
+                                        <option value="">--</option>
+                                        <option value="true" selected="@(r.Pmi == true)">Yes</option>
+                                        <option value="false" selected="@(r.Pmi == false)">No</option>
+                                    </select>
+                                </td>
+                                <td><input type="text" name="dwgRemarksVals" value="@r.DwgRemarks" /></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="save-bar">
+                <button type="submit" class="btn btn-primary">&#10003; Save Changes</button>
+            </div>
+        </form>
+    }
+    else if (hasFilter && Model.Count == 0)
+    {
+        <div class="msg-bar">No rows match the selected filters.</div>
+
+        <div class="toolbar">
+            <button type="button" class="btn btn-outline" onclick="togglePanel('uploadPanelEmpty')">&#8682; Upload Excel</button>
+        </div>
+        <div id="uploadPanelEmpty" class="upload-panel">
+            <div class="section-title">Upload Excel — update rows by Line ID</div>
+            <form method="post" asp-action="ImportNdtPercentage" asp-controller="Home" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" style="font-size:.88rem;" />
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    }
+    else
+    {
+        <div class="msg-bar">Select at least one filter and click <strong>Filter</strong> to load rows, or upload an Excel file to update directly.</div>
+        <div class="toolbar">
+            <button type="button" class="btn btn-outline" onclick="togglePanel('uploadPanelInit')">&#8682; Upload Excel</button>
+        </div>
+        <div id="uploadPanelInit" class="upload-panel">
+            <div class="section-title">Upload Excel — update rows by Line ID</div>
+            <form method="post" asp-action="ImportNdtPercentage" asp-controller="Home" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <input type="file" name="excelFile" accept=".xlsx,.xls" style="font-size:.88rem;" />
+                    <button type="submit" class="btn btn-success">Import</button>
+                </div>
+            </form>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+    function togglePanel(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('show');
+    }
+
+    // ── Multi-select dropdown behaviour ──────────────────────
+    function initMs(wrap) {
+        var toggle = wrap.querySelector('.ms-toggle');
+        var panel = wrap.querySelector('.ms-panel');
+        var search = wrap.querySelector('.ms-search');
+        var placeholder = wrap.dataset.msPlaceholder || 'Select...';
+        var labelSpan = toggle.querySelector('.ms-label');
+
+        function updateLabel() {
+            var checked = wrap.querySelectorAll('.ms-option input:checked');
+            if (checked.length === 0) { labelSpan.textContent = placeholder; }
+            else if (checked.length === 1) { labelSpan.textContent = checked[0].parentElement.textContent.trim(); }
+            else { labelSpan.textContent = checked.length + ' selected'; }
+        }
+
+        if (!wrap.dataset.msInit) {
+            wrap.dataset.msInit = '1';
+
+            toggle.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var wasOpen = wrap.classList.contains('ms-open');
+                closeAllMs();
+                if (!wasOpen) { wrap.classList.add('ms-open'); panel.style.display = 'block'; if (search) search.focus(); }
+            });
+
+            if (search) {
+                search.addEventListener('input', function () {
+                    var q = search.value.toLowerCase();
+                    var any = false;
+                    wrap.querySelectorAll('.ms-option').forEach(function (opt) {
+                        var match = opt.textContent.toLowerCase().indexOf(q) >= 0;
+                        opt.classList.toggle('ms-hidden', !match);
+                        if (match) any = true;
+                    });
+                    var nm = wrap.querySelector('.ms-no-match');
+                    if (nm) nm.style.display = any ? 'none' : 'block';
+                });
+            }
+
+            wrap.querySelectorAll('.ms-actions button').forEach(function (b) {
+                b.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var action = b.dataset.action;
+                    wrap.querySelectorAll('.ms-option').forEach(function (opt) {
+                        if (!opt.classList.contains('ms-hidden')) {
+                            opt.querySelector('input').checked = (action === 'all');
+                        }
+                    });
+                    updateLabel();
+                });
+            });
+
+            var optionsContainer = wrap.querySelector('.ms-options');
+            if (optionsContainer) {
+                optionsContainer.addEventListener('change', function () {
+                    updateLabel();
+                });
+            }
+        }
+
+        updateLabel();
+    }
+
+    function closeAllMs() {
+        document.querySelectorAll('.ms-wrap').forEach(function (w) {
+            w.classList.remove('ms-open');
+            var p = w.querySelector('.ms-panel');
+            if (p) p.style.display = 'none';
+        });
+    }
+    document.addEventListener('click', closeAllMs);
+    document.querySelectorAll('.ms-wrap').forEach(initMs);
+
+    // ── Cascading: Sheet → Weld (for NDT Percentage) ────────
+    (function () {
+        var msSheet = document.getElementById('msSheet');
+        var msWeld = document.getElementById('msWeld');
+        if (!msSheet || !msWeld) return;
+
+        function getCheckedValues(wrap, name) {
+            var vals = [];
+            wrap.querySelectorAll('.ms-option input[name="' + name + '"]:checked').forEach(function (cb) {
+                vals.push(cb.value);
+            });
+            return vals;
+        }
+
+        function getAllCheckedProjectNos() {
+            var vals = [];
+            document.querySelectorAll('.ms-option input[name="projectNo"]:checked').forEach(function (cb) {
+                vals.push(cb.value);
+            });
+            return vals;
+        }
+
+        function getAllCheckedLayoutNos() {
+            var vals = [];
+            document.querySelectorAll('.ms-option input[name="layoutNo"]:checked').forEach(function (cb) {
+                vals.push(cb.value);
+            });
+            return vals;
+        }
+
+        function rebuildOptions(wrap, name, items, keepSelected) {
+            var container = wrap.querySelector('.ms-options');
+            var search = wrap.querySelector('.ms-search');
+            if (search) search.value = '';
+            container.innerHTML = '';
+            items.forEach(function (val) {
+                var lbl = document.createElement('label');
+                lbl.className = 'ms-option';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.name = name; cb.value = val;
+                if (keepSelected && keepSelected.indexOf(val) >= 0) cb.checked = true;
+                lbl.appendChild(cb);
+                lbl.appendChild(document.createTextNode(' ' + val));
+                container.appendChild(lbl);
+            });
+            initMs(wrap);
+        }
+
+        function buildQs(pids, lnos, snos) {
+            var parts = [];
+            (pids || []).forEach(function (v) { parts.push('projectNo=' + encodeURIComponent(v)); });
+            (lnos || []).forEach(function (v) { parts.push('layoutNo=' + encodeURIComponent(v)); });
+            (snos || []).forEach(function (v) { parts.push('sheetNo=' + encodeURIComponent(v)); });
+            return parts.join('&');
+        }
+
+        function refreshSheets() {
+            var pids = getAllCheckedProjectNos();
+            var lnos = getAllCheckedLayoutNos();
+            fetch('/Home/GetNdtSheetNos?' + buildQs(pids, lnos))
+                .then(function (r) { return r.json(); })
+                .then(function (items) {
+                    var sel = getCheckedValues(msSheet, 'sheetNo');
+                    rebuildOptions(msSheet, 'sheetNo', items, sel);
+                    refreshWelds();
+                });
+        }
+
+        function refreshWelds() {
+            var pids = getAllCheckedProjectNos();
+            var lnos = getAllCheckedLayoutNos();
+            var snos = getCheckedValues(msSheet, 'sheetNo');
+            fetch('/Home/GetNdtWeldNumbers?' + buildQs(pids, lnos, snos))
+                .then(function (r) { return r.json(); })
+                .then(function (items) {
+                    var sel = getCheckedValues(msWeld, 'weldNumber');
+                    rebuildOptions(msWeld, 'weldNumber', items, sel);
+                });
+        }
+
+        // Listen for changes in project / layout dropdowns to cascade into sheet / weld
+        document.querySelectorAll('.ms-option input[name="projectNo"]').forEach(function (cb) {
+            cb.addEventListener('change', function () { refreshSheets(); });
+        });
+        document.querySelectorAll('.ms-option input[name="layoutNo"]').forEach(function (cb) {
+            cb.addEventListener('change', function () { refreshSheets(); });
+        });
+        msSheet.addEventListener('change', function (e) {
+            if (e.target.name === 'sheetNo') refreshWelds();
+        });
+    })();
+</script>
+}

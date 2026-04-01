@@ -1,0 +1,328 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model PMS.Models.WelderStatusPageViewModel
+@{
+    Layout = "_LayoutDashboard";
+    ViewData["Title"] = "Welders Status";
+    var selectedSet = new HashSet<int>(Model.SelectedProjectIds);
+}
+
+@section Head {
+    <style>
+        .ws-container { padding: 12px 12px 32px; background: #fff8eb; min-height: calc(100vh - 120px); }
+        .ws-card { background: #fff8eb; border: 1px solid #e6f6fa; border-radius: 10px; box-shadow: 0 4px 12px rgba(31,153,190,0.12); padding: 14px 16px; position: relative; }
+        .ws-card-header { font-size: 1.3em; font-weight: 700; color: #176d8a; margin-bottom: 12px; }
+        .ws-filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; align-items: flex-end; }
+        .ws-filter { display: flex; flex-direction: column; gap: 6px; min-width: 140px; }
+        .ws-filter label { color: #176d8a; font-weight: 600; font-size: .9rem; }
+        .ws-input { padding: 8px 10px; border: 1px solid #cce7ef; border-radius: 6px; color: #176d8a; background: #fff; min-width: 140px; font-size: .9rem; }
+        .ws-input:focus { border-color: #176d8a; outline: none; }
+        .ws-actions { display: flex; align-items: flex-end; gap: 8px; }
+        .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid transparent; font-weight: 700; cursor: pointer; line-height: 1.2; font-size: .9rem; }
+        .btn-primary { background: #1f99be; color: #fff; border-color: #1f99be; }
+        .btn-primary:hover { background: #176d8a; border-color: #176d8a; }
+        .btn-outline { background: #fff; color: #176d8a; border: 1px solid #1f99be; }
+        .btn-outline:hover { background: #1f99be; color: #fff; }
+        .ws-table-card { background: #fff; border: 1px solid #e6f6fa; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(31,153,190,0.08); }
+        .ws-table-title { font-weight: 700; color: #176d8a; margin-bottom: 6px; font-size: .95rem; }
+        .ws-table-wrap { max-height: calc(100vh - 300px); overflow: auto; scrollbar-color: #0d9b8c #e6f6fa; scrollbar-width: thin; }
+        .ws-table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+        .ws-table-wrap::-webkit-scrollbar-track { background: #e6f6fa; border-radius: 8px; }
+        .ws-table-wrap::-webkit-scrollbar-thumb { background: #0d9b8c; border-radius: 8px; }
+        .ws-table-wrap::-webkit-scrollbar-thumb:hover { background: #0b877a; }
+        .ws-table { width: 100%; border-collapse: collapse; background: #fff; }
+        .ws-table th, .ws-table td { border: 1px solid #e6f6fa; padding: 8px 10px; color: #176d8a; font-size: .9rem; white-space: nowrap; }
+        .ws-table th { position: sticky; top: 0; background: #f0fbff; z-index: 1; text-align: left; font-weight: 700; }
+        .ws-table tr:hover td { background: #f8fcff; }
+        .ws-empty { color: #176d8a; font-size: .95rem; padding: 20px 0; }
+        .ws-error { color: #cc0000; font-size: .9rem; font-weight: 600; padding: 8px 12px; background: #fff0f0; border: 1px solid #ffcccc; border-radius: 6px; margin-bottom: 10px; }
+        .ws-count { color: #176d8a; font-size: .85rem; font-weight: 600; margin-bottom: 6px; }
+        /* Multi-select dropdown */
+        .ms-wrap { position: relative; display: inline-block; vertical-align: middle; min-width: 370px; }
+        .ms-toggle { width: 100%; box-sizing: border-box; cursor: pointer; font-family: inherit; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .ms-toggle::after { content: '\25BC'; font-size: .65rem; color: #176d8a; flex-shrink: 0; }
+        .ms-open .ms-toggle::after { content: '\25B2'; }
+        .ms-open .ms-toggle { border-radius: 6px 6px 0 0; border-color: #176d8a; }
+        .ms-panel { display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 1200; background: #fff; border: 1px solid #176d8a; border-top: none; border-radius: 0 0 6px 6px; max-height: 260px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,.12); scrollbar-width: thin; scrollbar-color: #0d9b8c #e6f6fa; }
+        .ms-panel::-webkit-scrollbar { width: 10px; }
+        .ms-panel::-webkit-scrollbar-track { background: #e6f6fa; border-radius: 8px; }
+        .ms-panel::-webkit-scrollbar-thumb { background: #0d9b8c; border-radius: 8px; }
+        .ms-panel::-webkit-scrollbar-thumb:hover { background: #0b877a; }
+        .ms-search { width: 100%; box-sizing: border-box; padding: 6px 10px; border: none; border-bottom: 1px solid #e6f6fa; font-size: .85rem; color: #176d8a; outline: none; font-family: inherit; }
+        .ms-actions { display: flex; gap: 4px; padding: 4px 8px; border-bottom: 1px solid #e6f6fa; }
+        .ms-actions button { font-size: .75rem; padding: 2px 8px; border-radius: 4px; border: 1px solid #cce7ef; background: #f0fbff; color: #176d8a; cursor: pointer; font-weight: 600; }
+        .ms-actions button:hover { background: #1f99be; color: #fff; border-color: #1f99be; }
+        .ms-option { display: flex; align-items: center; gap: 6px; padding: 5px 10px; cursor: pointer; font-size: .85rem; color: #176d8a; }
+        .ms-option:hover { background: #e6f6fa; }
+        .ms-option input[type="checkbox"] { accent-color: #1f99be; cursor: pointer; }
+        .ms-option.ms-hidden { display: none; }
+        .ms-no-match { padding: 6px 10px; font-size: .85rem; color: #999; font-style: italic; }
+        /* Searchable select dropdown (for Week) */
+        .ss-wrap { position: relative; display: inline-block; vertical-align: middle; min-width: 370px; }
+        .ss-input.ws-input { width: 100%; box-sizing: border-box; cursor: pointer; font-family: inherit; font-weight: 600; }
+        .ss-input.ws-input:focus { cursor: text; border-color: #176d8a; outline: none; }
+        .ss-list { display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 1200; background: #fff; border: 1px solid #176d8a; border-top: none; border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,.12); scrollbar-width: thin; scrollbar-color: #0d9b8c #e6f6fa; }
+        .ss-list::-webkit-scrollbar { width: 10px; height: 10px; }
+        .ss-list::-webkit-scrollbar-track { background: #e6f6fa; border-radius: 8px; }
+        .ss-list::-webkit-scrollbar-thumb { background: #0d9b8c; border-radius: 8px; }
+        .ss-list::-webkit-scrollbar-thumb:hover { background: #0b877a; }
+        .ss-item { padding: 6px 10px; cursor: pointer; font-size: .9rem; color: #176d8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ss-item:hover, .ss-item.ss-highlight { background: #e6f6fa; }
+        .ss-item.ss-active { font-weight: 700; }
+        .ss-empty { padding: 6px 10px; font-size: .85rem; color: #999; font-style: italic; }
+        .ss-open .ss-input { border-radius: 6px 6px 0 0; border-color: #176d8a; }
+        @@media (max-width: 1024px) { .ws-filters { gap: 8px; } .ms-wrap, .ss-wrap { min-width: 260px; } }
+        @@media (max-width: 640px) { .ws-container { padding: 12px; } .ws-filters { flex-direction: column; } .ms-wrap, .ss-wrap { min-width: 100%; } }
+    </style>
+}
+
+<div class="ws-container">
+    <div class="ws-card">
+        <div class="ws-card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span>Welders Status</span>
+            <a asp-action="WrrStatus" asp-controller="Home" class="btn btn-outline" style="font-size:.85rem;padding:6px 14px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .2s,color .2s;"><span style="font-size:1.1em;line-height:1;">&#8592;</span> WRR Status</a>
+        </div>
+
+        <form method="get" asp-action="WelderStatus" asp-controller="Home" class="ws-filters">
+            <div class="ws-filter">
+                <label>Project No.</label>
+                <div class="ms-wrap" id="projectMultiSelect">
+                    <div class="ms-toggle ws-input" tabindex="0">
+                        <span class="ms-label">Select projects...</span>
+                    </div>
+                    <div class="ms-panel">
+                        <input type="text" class="ms-search" placeholder="Search projects..." />
+                        <div class="ms-actions">
+                            <button type="button" data-action="all">All</button>
+                            <button type="button" data-action="none">None</button>
+                        </div>
+                        <div class="ms-options">
+                            @foreach (var p in Model.Projects)
+                            {
+                                var isChecked = selectedSet.Contains(p.Id);
+                                <label class="ms-option">
+                                    <input type="checkbox" name="projectId" value="@p.Id" @(isChecked ? "checked" : "") />
+                                    @p.Id - @p.Name
+                                </label>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ws-filter">
+                <label for="week">Week</label>
+                <select id="week" name="week" class="ws-input">
+                    @if (string.IsNullOrWhiteSpace(Model.Week))
+                    {
+                        <option value="" selected>-- Select week --</option>
+                    }
+                    else
+                    {
+                        <option value="">-- Select week --</option>
+                    }
+                    @foreach (var lot in Model.AvailableWeeks)
+                    {
+                        var fromTxt = lot.From?.ToString("dd-MM-yyyy") ?? string.Empty;
+                        var toTxt = lot.To?.ToString("dd-MM-yyyy") ?? string.Empty;
+                        var datePart = (fromTxt != string.Empty || toTxt != string.Empty)
+                            ? $" ({fromTxt}{(toTxt != string.Empty ? " - " + toTxt : string.Empty)})"
+                            : string.Empty;
+                        var display = lot.LotNo + datePart;
+                        if (string.Equals(Model.Week, lot.LotNo, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <option value="@lot.LotNo" selected>@display</option>
+                        }
+                        else
+                        {
+                            <option value="@lot.LotNo">@display</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="ws-actions">
+                <button type="submit" class="btn btn-primary">Load</button>
+                @if (Model.Results.Rows.Count > 0)
+                {
+                    var exportParams = $"week={Uri.EscapeDataString(Model.Week ?? "")}&{string.Join("&", Model.SelectedProjectIds.Select(id => $"projectId={id}"))}";
+                    <a href="@Url.Action("ExportWelderStatusExcel", "Home")?@exportParams" class="btn btn-outline" style="font-size:.85rem;padding:8px 14px;display:inline-flex;align-items:center;gap:6px;text-decoration:none;">
+                        &#128196; Download Excel
+                    </a>
+                }
+            </div>
+        </form>
+
+        @if (ViewBag.ErrorMessage is string err && !string.IsNullOrWhiteSpace(err))
+        {
+            <div class="ws-error">@err</div>
+        }
+
+        @if (string.IsNullOrWhiteSpace(Model.Week))
+        {
+            <div class="ws-empty">Select a project and week, then click Load.</div>
+        }
+        else if (Model.Results.Rows.Count == 0)
+        {
+            <div class="ws-empty">No welder status records found for the selected criteria.</div>
+        }
+        else
+        {
+            <div class="ws-table-card">
+                <div class="ws-count">@Model.Results.Rows.Count record(s)</div>
+                <div class="ws-table-wrap">
+                    <table class="ws-table">
+                        <thead>
+                            <tr>
+                                @foreach (System.Data.DataColumn column in Model.Results.Columns)
+                                {
+                                    <th>@column.ColumnName</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (System.Data.DataRow row in Model.Results.Rows)
+                            {
+                                <tr>
+                                    @foreach (System.Data.DataColumn column in Model.Results.Columns)
+                                    {
+                                        <td>@row[column]</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+    // Searchable dropdown widget (for Week)
+    function makeSearchableSelect(sel) {
+        if (!sel || sel._ssWidget) return;
+        sel.style.display = 'none';
+        var wrap = document.createElement('div'); wrap.className = 'ss-wrap';
+        sel.parentNode.insertBefore(wrap, sel); wrap.appendChild(sel);
+        var input = document.createElement('input'); input.type = 'text'; input.className = 'ss-input ws-input'; input.setAttribute('autocomplete', 'off'); input.setAttribute('spellcheck', 'false'); input.placeholder = '';
+        wrap.appendChild(input);
+        var list = document.createElement('div'); list.className = 'ss-list'; wrap.appendChild(list);
+        var items = [], highlighted = -1, open = false;
+        function buildItems() { items = []; Array.from(sel.options).forEach(function (opt) { items.push({ value: opt.value, text: opt.text || opt.value }); }); }
+        function syncInputText() { var idx = sel.selectedIndex; input.value = idx >= 0 && sel.options[idx] ? (sel.options[idx].text || sel.options[idx].value) : ''; }
+        function render(filter) {
+            list.innerHTML = ''; highlighted = -1; var lc = (filter || '').toLowerCase(); var count = 0;
+            items.forEach(function (item, i) {
+                if (lc && !(item.text || '').toLowerCase().includes(lc)) return;
+                var div = document.createElement('div'); div.className = 'ss-item'; div.textContent = item.text; div.dataset.idx = String(i);
+                if (item.value === sel.value) div.classList.add('ss-active');
+                div.addEventListener('mousedown', function (e) { e.preventDefault(); pick(i); }); list.appendChild(div); count++;
+            });
+            if (count === 0) { var em = document.createElement('div'); em.className = 'ss-empty'; em.textContent = 'No match'; list.appendChild(em); }
+        }
+        function pick(idx) { if (idx < 0 || idx >= items.length) return; sel.value = items[idx].value; syncInputText(); close(); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+        function show() { if (open) return; open = true; render(input.value !== (items[sel.selectedIndex] ? items[sel.selectedIndex].text : '') ? input.value : ''); list.style.display = 'block'; wrap.classList.add('ss-open'); }
+        function close() { open = false; list.style.display = 'none'; wrap.classList.remove('ss-open'); highlighted = -1; }
+        function highlightItem(dir) {
+            var visible = list.querySelectorAll('.ss-item'); if (!visible.length) return;
+            if (dir === 'down') highlighted = highlighted < visible.length - 1 ? highlighted + 1 : 0; else highlighted = highlighted > 0 ? highlighted - 1 : visible.length - 1;
+            visible.forEach(function (el, i) { el.classList.toggle('ss-highlight', i === highlighted); }); if (visible[highlighted]) visible[highlighted].scrollIntoView({ block: 'nearest' });
+        }
+        input.addEventListener('focus', function () { buildItems(); input.select(); show(); });
+        input.addEventListener('input', function () { buildItems(); show(); render(input.value); });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (!open) { show(); render(''); } highlightItem('down'); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); highlightItem('up'); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (open && highlighted >= 0) { var vis = list.querySelectorAll('.ss-item'); if (vis[highlighted]) { var idx = parseInt(vis[highlighted].dataset.idx, 10); pick(idx); } } }
+            else if (e.key === 'Escape') { syncInputText(); close(); input.blur(); }
+            else if (e.key === 'Tab') { syncInputText(); close(); }
+        });
+        input.addEventListener('blur', function () { setTimeout(function () { if (!wrap.contains(document.activeElement)) { syncInputText(); close(); } }, 150); });
+        var mo = new MutationObserver(function () { buildItems(); syncInputText(); if (open) render(input.value); });
+        mo.observe(sel, { childList: true, subtree: true });
+        buildItems(); syncInputText();
+        sel._ssWidget = { rebuild: function () { buildItems(); syncInputText(); if (open) render(input.value); } };
+        sel.dataset.searchable = '1';
+    }
+
+    // Multi-select dropdown widget (for Project No.)
+    (function () {
+        var wrap = document.getElementById('projectMultiSelect');
+        if (!wrap) return;
+        var toggle = wrap.querySelector('.ms-toggle');
+        var label = wrap.querySelector('.ms-label');
+        var panel = wrap.querySelector('.ms-panel');
+        var search = wrap.querySelector('.ms-search');
+        var options = wrap.querySelectorAll('.ms-option');
+        var checkboxes = wrap.querySelectorAll('.ms-option input[type="checkbox"]');
+        var open = false;
+
+        function updateLabel() {
+            var checked = wrap.querySelectorAll('.ms-option input[type="checkbox"]:checked');
+            if (checked.length === 0) { label.textContent = 'Select projects...'; }
+            else if (checked.length === checkboxes.length) { label.textContent = 'All projects (' + checked.length + ')'; }
+            else if (checked.length <= 2) {
+                var names = [];
+                checked.forEach(function (cb) { names.push(cb.parentElement.textContent.trim()); });
+                label.textContent = names.join(', ');
+            } else { label.textContent = checked.length + ' project(s) selected'; }
+        }
+
+        function showPanel() {
+            if (open) return;
+            open = true;
+            panel.style.display = 'block';
+            wrap.classList.add('ms-open');
+            search.value = '';
+            filterOptions('');
+            search.focus();
+        }
+
+        function hidePanel() {
+            if (!open) return;
+            open = false;
+            panel.style.display = 'none';
+            wrap.classList.remove('ms-open');
+        }
+
+        function filterOptions(text) {
+            var lc = text.toLowerCase();
+            var visible = 0;
+            options.forEach(function (opt) {
+                var match = !lc || opt.textContent.toLowerCase().includes(lc);
+                opt.classList.toggle('ms-hidden', !match);
+                if (match) visible++;
+            });
+            var noMatch = panel.querySelector('.ms-no-match');
+            if (visible === 0) {
+                if (!noMatch) { noMatch = document.createElement('div'); noMatch.className = 'ms-no-match'; noMatch.textContent = 'No match'; panel.querySelector('.ms-options').appendChild(noMatch); }
+            } else if (noMatch) { noMatch.remove(); }
+        }
+
+        toggle.addEventListener('click', function () { open ? hidePanel() : showPanel(); });
+        toggle.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open ? hidePanel() : showPanel(); } });
+
+        search.addEventListener('input', function () { filterOptions(search.value); });
+
+        checkboxes.forEach(function (cb) { cb.addEventListener('change', updateLabel); });
+
+        wrap.querySelectorAll('.ms-actions button').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var action = btn.dataset.action;
+                checkboxes.forEach(function (cb) {
+                    if (!cb.closest('.ms-option').classList.contains('ms-hidden')) {
+                        cb.checked = (action === 'all');
+                    }
+                });
+                updateLabel();
+            });
+        });
+
+        document.addEventListener('mousedown', function (e) { if (open && !wrap.contains(e.target)) hidePanel(); });
+
+        updateLabel();
+
+        // Week searchable select
+        var weekSelect = document.getElementById('week');
+        if (weekSelect) makeSearchableSelect(weekSelect);
+    })();
+</script>
