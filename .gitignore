@@ -25,3 +25,6 @@ Desktop.ini
 
 ## Uploaded drawings (large binary PDFs - stored outside Git)
 PMS/wwwroot/drawings/
+
+## Portfolio (separate project - not part of PMS)
+Portfolio/
