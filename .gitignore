@@ -22,3 +22,6 @@ packages/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+## Uploaded drawings (large binary PDFs - stored outside Git)
+PMS/wwwroot/drawings/
